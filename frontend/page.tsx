@@ -80,6 +80,17 @@ export default function ClaimVerifier() {
   const [betAmount, setBetAmount] = useState("1")
   const [activeTab, setActiveTab] = useState("all")
 
+  // Add state for user positions
+  const [userPositions, setUserPositions] = useState<{
+    type: 'yes' | 'no',
+    amount: number,
+    price: number,
+    quantity: number
+  }[]>([])
+
+  // Track active trade tab
+  const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy')
+
   // Calculate probabilities and prices
   const yesProbability = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 50
   const noProbability = totalVotes > 0 ? 100 - yesProbability : 50
@@ -194,12 +205,65 @@ export default function ClaimVerifier() {
   };
 
   const handleVote = (type: 'yes' | 'no') => {
+    // Update vote counts
     if (type === 'yes') {
-      setYesVotes(prev => prev + 1);
+      setYesVotes(prev => prev + 1)
     } else {
-      setNoVotes(prev => prev + 1);
+      setNoVotes(prev => prev + 1)
     }
-  };
+
+    // Calculate price and quantity
+    const price = type === 'yes' ? Number(yesPrice) : Number(noPrice)
+    const quantity = Math.floor(Number(betAmount) / price * 100) // Convert to shares (cents)
+
+    // Add to positions
+    setUserPositions(prev => [
+      ...prev,
+      {
+        type,
+        amount: Number(betAmount),
+        price,
+        quantity
+      }
+    ])
+
+    // Reset bet amount
+    setBetAmount("1")
+  }
+
+  // Calculate total position value
+  const calculateTotalPosition = () => {
+    if (userPositions.length === 0) return { total: 0, potential: 0, type: null }
+
+    const yesPositions = userPositions.filter(p => p.type === 'yes')
+    const noPositions = userPositions.filter(p => p.type === 'no')
+
+    const yesAmount = yesPositions.reduce((sum, p) => sum + p.amount, 0)
+    const noAmount = noPositions.reduce((sum, p) => sum + p.amount, 0)
+
+    let type: 'yes' | 'no' | null = null
+    let total = 0
+    let potential = 0
+
+    if (yesAmount > noAmount) {
+      type = 'yes'
+      total = yesAmount - noAmount
+      // Calculate potential winnings using current probability
+      potential = total / Number(yesPrice)
+    } else if (noAmount > yesAmount) {
+      type = 'no'
+      total = noAmount - yesAmount
+      potential = total / Number(noPrice)
+    } else {
+      type = null
+      total = 0
+      potential = 0
+    }
+
+    return { total, potential, type }
+  }
+
+  const position = calculateTotalPosition()
 
   const handleAmountChange = (amount: string) => {
     setBetAmount(amount);
@@ -242,7 +306,7 @@ export default function ClaimVerifier() {
             <Button variant="default" className="bg-blue-500 hover:bg-blue-600">Deposit</Button>
           </div>
         </div>
-      </header>
+          </header>
 
       {/* Categories navbar */}
       <div className="bg-[#1A202C] border-b border-gray-800 px-4">
@@ -271,15 +335,15 @@ export default function ClaimVerifier() {
                 <div>
                   <label htmlFor="claim" className="block text-sm font-medium text-gray-400 mb-2">
                     Claim Title
-                  </label>
-                  <Input
-                    id="claim"
+                    </label>
+                    <Input
+                      id="claim"
                     value={claimInput}
                     onChange={(e) => setClaimInput(e.target.value)}
-                    placeholder="e.g., 'The Earth is flat'"
-                    className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:ring-cyan-500 focus:border-cyan-500"
-                  />
-                </div>
+                      placeholder="e.g., 'The Earth is flat'"
+                      className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:ring-cyan-500 focus:border-cyan-500"
+                    />
+                  </div>
 
                 {/* Claim Details */}
                 <div>
@@ -357,7 +421,7 @@ export default function ClaimVerifier() {
                   />
                 </div>
 
-                <Button
+                  <Button
                   onClick={handleCreateMarket}
                   disabled={!claimInput.trim()}
                   className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
@@ -501,12 +565,14 @@ export default function ClaimVerifier() {
                 <div className="border-b border-gray-800 px-6 py-4">
                   <div className="flex space-x-2">
                     <button
-                      className="text-lg font-medium border-b-2 border-white pb-2"
+                      className={`text-lg font-medium pb-2 ${tradeTab === 'buy' ? 'border-b-2 border-white' : 'text-gray-500'}`}
+                      onClick={() => setTradeTab('buy')}
                     >
                       Buy
                     </button>
                     <button
-                      className="text-lg font-medium text-gray-500 pb-2"
+                      className={`text-lg font-medium pb-2 ${tradeTab === 'sell' ? 'border-b-2 border-white' : 'text-gray-500'}`}
+                      onClick={() => setTradeTab('sell')}
                     >
                       Sell
                     </button>
@@ -514,21 +580,68 @@ export default function ClaimVerifier() {
                 </div>
 
                 <div className="p-6">
-                  {/* Yes/No buttons */}
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <button
-                      className="bg-green-600 hover:bg-green-700 rounded-md p-4 flex items-center justify-center font-medium"
-                      onClick={() => handleVote('yes')}
-                    >
-                      Yes {yesPrice}¢
-                    </button>
-                    <button
-                      className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
-                      onClick={() => handleVote('no')}
-                    >
-                      No {noPrice}¢
-                    </button>
-                  </div>
+                  {/* User Position - shown when they have a position */}
+                  {userPositions.length > 0 && (
+                    <div className="mb-6 border border-gray-700 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="text-gray-400">Your Position</div>
+                        <div className={position.type === 'yes' ? 'text-green-400' : 'text-orange-400'}>
+                          {position.type === 'yes' ? 'YES' : 'NO'}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                          <div className="text-gray-500 text-sm">Amount</div>
+                          <div className="text-white font-medium">${position.total.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-sm">Potential Profit</div>
+                          <div className="text-green-400 font-medium">${position.potential.toFixed(2)}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-500">
+                        Qty: {userPositions.reduce((sum, p) => sum + p.quantity, 0)} shares
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Yes/No buttons - standard layout if in Buy tab */}
+                  {tradeTab === 'buy' && (
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <button
+                        className="bg-blue-600 hover:bg-blue-700 rounded-md p-4 flex items-center justify-center font-medium"
+                        onClick={() => handleVote('yes')}
+                      >
+                        Yes {yesPrice}¢
+                      </button>
+                      <button
+                        className="bg-orange-500 hover:bg-orange-600 rounded-md p-4 flex items-center justify-center font-medium"
+                        onClick={() => handleVote('no')}
+                      >
+                        No {noPrice}¢
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Sell buttons - if in Sell tab and has positions */}
+                  {tradeTab === 'sell' && userPositions.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <button
+                        className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
+                        disabled={!userPositions.some(p => p.type === 'yes')}
+                      >
+                        Sell Yes
+                      </button>
+                      <button
+                        className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
+                        disabled={!userPositions.some(p => p.type === 'no')}
+                      >
+                        Sell No
+                      </button>
+                    </div>
+                  )}
 
                   {/* Amount */}
                   <div className="mb-4">
@@ -536,7 +649,7 @@ export default function ClaimVerifier() {
                       <span className="text-gray-400">Amount</span>
                       <span className="text-4xl">${betAmount}</span>
                     </div>
-                    <div className="text-sm text-gray-400 mb-4">Balance $0.00</div>
+                    <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
 
                     {/* Amount buttons */}
                     <div className="grid grid-cols-4 gap-2 mb-6">
@@ -568,21 +681,35 @@ export default function ClaimVerifier() {
                   </div>
 
                   {/* To win */}
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <div className="flex items-center">
-                        <span className="text-lg">To win</span>
-                        <span className="text-green-400 ml-1">💰</span>
+                  {tradeTab === 'buy' && (
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <div className="flex items-center">
+                          <span className="text-lg">To win</span>
+                          <span className="text-green-400 ml-1">💰</span>
+                        </div>
+                        <div className="text-sm text-gray-500">Avg. Price {yesPrice}¢</div>
                       </div>
-                      <div className="text-sm text-gray-500">Avg. Price {yesPrice}¢</div>
+                      <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
                     </div>
-                    <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
-                  </div>
+                  )}
 
-                  {/* Deposit button */}
-                  <button className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-md font-medium">
-                    Deposit
-                  </button>
+                  {/* CTA Button */}
+                  {tradeTab === 'buy' ? (
+                    <button
+                      className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-md font-medium"
+                      onClick={() => handleVote('no')}
+                    >
+                      Buy No
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-md font-medium"
+                      disabled={userPositions.length === 0}
+                    >
+                      Sell Position
+                    </button>
+                  )}
 
                   <div className="text-center text-sm text-gray-500 mt-4">
                     By trading, you agree to the Terms of Use.
@@ -604,61 +731,61 @@ export default function ClaimVerifier() {
                   onClick={handleVerify}
                   disabled={isVerifying}
                   className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
-                >
-                  {isVerifying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Verifying...
-                    </>
-                  ) : (
+                      </>
+                    ) : (
                     "Start Verification"
-                  )}
-                </Button>
-              </div>
+                    )}
+                  </Button>
+            </div>
 
               {/* Verification Result */}
-              {result && (
-                <div className="relative">
-                  <div
+            {result && (
+              <div className="relative">
+                <div
                     className={`absolute -inset-0.5 rounded-lg blur opacity-30 ${
-                      color[result.decision]
-                    }`}
-                  ></div>
-                  <div className="relative bg-gray-900 rounded-lg p-6 shadow-xl">
-                    <div className="text-center mb-4">
-                      <h3 className="text-2xl font-bold">{result.decision.toUpperCase()}</h3>
-                      <div className="mt-2 flex justify-center">
-                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-800">
-                          <div className="mr-2">Confidence:</div>
-                          <div className="h-2 w-24 bg-gray-700 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${bgColor[result.decision]}`}
-                              style={{ width: `${result.confidence}%` }}
-                            ></div>
-                          </div>
-                          <div className="ml-2 font-medium">{result.confidence}%</div>
+                    color[result.decision]
+                  }`}
+                ></div>
+                <div className="relative bg-gray-900 rounded-lg p-6 shadow-xl">
+                  <div className="text-center mb-4">
+                    <h3 className="text-2xl font-bold">{result.decision.toUpperCase()}</h3>
+                    <div className="mt-2 flex justify-center">
+                      <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-800">
+                        <div className="mr-2">Confidence:</div>
+                        <div className="h-2 w-24 bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${bgColor[result.decision]}`}
+                            style={{ width: `${result.confidence}%` }}
+                          ></div>
                         </div>
+                        <div className="ml-2 font-medium">{result.confidence}%</div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center justify-center mb-4">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center">
-                        {circle[result.decision]}
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                      <p className="text-gray-300 text-left">{result.reason}</p>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Log Display */}
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center">
+                      {circle[result.decision]}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <p className="text-gray-300 text-left">{result.reason}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Log Display */}
               {(isVerifying || logs.length > 0) && (
-                <div className="mb-6">
+            <div className="mb-6">
                   <h2 className="text-lg font-medium mb-2">Verification Process Logs</h2>
-                  <LogDisplay logs={logs} />
+              <LogDisplay logs={logs} />
                 </div>
               )}
             </div>
