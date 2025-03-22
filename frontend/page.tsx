@@ -36,7 +36,9 @@ const circle = {
 }
 
 export default function ClaimVerifier() {
+  const [claimInput, setClaimInput] = useState("")
   const [claim, setClaim] = useState("")
+  const [showDashboard, setShowDashboard] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [result, setResult] = useState<null | {
     decision: "true" | "false" | "depends" | "inconclusive" | "too_early"
@@ -60,6 +62,13 @@ export default function ClaimVerifier() {
   useEffect(() => {
     setTotalVotes(yesVotes + noVotes)
   }, [yesVotes, noVotes])
+
+  const handleCreateMarket = () => {
+    if (!claimInput.trim()) return
+
+    setClaim(claimInput.trim())
+    setShowDashboard(true)
+  }
 
   const handleVerify = async () => {
     if (!claim.trim()) return
@@ -205,7 +214,7 @@ export default function ClaimVerifier() {
       <div className="flex-1 p-4 sm:p-8">
         <div className="max-w-6xl mx-auto">
           {/* Claim Input Section */}
-          {!claim && (
+          {!showDashboard && (
             <div className="bg-gray-900 rounded-lg p-6 shadow-xl mb-8">
               <h2 className="text-xl font-bold mb-4">Create a New Market</h2>
               <div className="space-y-4">
@@ -215,15 +224,20 @@ export default function ClaimVerifier() {
                   </label>
                   <Input
                     id="claim"
-                    value={claim}
-                    onChange={(e) => setClaim(e.target.value)}
+                    value={claimInput}
+                    onChange={(e) => setClaimInput(e.target.value)}
                     placeholder="e.g., 'The Earth is flat'"
                     className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:ring-cyan-500 focus:border-cyan-500"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && claimInput.trim()) {
+                        handleCreateMarket();
+                      }
+                    }}
                   />
                 </div>
                 <Button
-                  onClick={() => setClaim(claim.trim())}
-                  disabled={!claim.trim()}
+                  onClick={handleCreateMarket}
+                  disabled={!claimInput.trim()}
                   className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
                 >
                   Create Market
@@ -233,7 +247,7 @@ export default function ClaimVerifier() {
           )}
 
           {/* Market Display */}
-          {claim && (
+          {showDashboard && (
             <div className="space-y-8">
               {/* Market Header */}
               <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
