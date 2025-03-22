@@ -8,6 +8,16 @@ import { Loader2, CheckCircle, XCircle, CircleHelp, Clock, ChevronDown, Upload, 
 import TruthOrb from "./truth-orb"
 import axios from "axios"
 import LogDisplay from './components/LogDisplay'
+import {
+  calculateLiquidity,
+  calculatePrice,
+  calculateCostToBuy,
+  calculateSharesToBuy,
+  initializeMarket,
+  priceToPercent,
+  formatPrice
+} from "@/utils/lmsr";
+import PriceChart from "@/components/PriceChart";
 
 const API_URL = "http://localhost:3000/truthseeker/"
 axios.defaults.baseURL = API_URL
@@ -95,20 +105,58 @@ export default function ClaimVerifier() {
   // Add state for selected position
   const [selectedPosition, setSelectedPosition] = useState<'yes' | 'no' | null>(null)
 
-  // Calculate probabilities and prices
-  const yesProbability = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 50
-  const noProbability = totalVotes > 0 ? 100 - yesProbability : 50
-  const yesPrice = (yesProbability / 100).toFixed(2)
-  const noPrice = (noProbability / 100).toFixed(2)
+  // Add LMSR state
+  const [marketQuantities, setMarketQuantities] = useState<number[]>([0, 0]); // [yes, no]
+  const [marketVolume, setMarketVolume] = useState(0);
 
-  // Calculate potential winnings based on selected position
+  // Calculate liquidity parameter based on volume
+  const liquidity = calculateLiquidity(marketVolume);
+
+  // Calculate LMSR prices
+  const calcLmsrPrices = () => {
+    const yesPrice = calculatePrice(0, marketQuantities, liquidity);
+    const noPrice = calculatePrice(1, marketQuantities, liquidity);
+
+    return {
+      yesProbability: priceToPercent(yesPrice),
+      noProbability: priceToPercent(noPrice),
+      yesPrice: formatPrice(yesPrice),
+      noPrice: formatPrice(noPrice)
+    };
+  };
+
+  // Use LMSR prices instead of simple calculation
+  const { yesProbability, noProbability, yesPrice, noPrice } = calcLmsrPrices();
+
+  // Calculate potential winnings with LMSR
   const calculatePotentialWin = () => {
-    if (!selectedPosition) return "0.00"
-    const price = selectedPosition === 'yes' ? Number(yesPrice) : Number(noPrice)
-    return (Number(betAmount) / price).toFixed(2)
-  }
+    if (!selectedPosition) return "0.00";
 
-  const potentialWin = calculatePotentialWin()
+    const outcomeIndex = selectedPosition === 'yes' ? 0 : 1;
+    const amount = Number(betAmount);
+
+    if (amount <= 0) return "0.00";
+
+    const shares = calculateSharesToBuy(
+      outcomeIndex,
+      amount,
+      marketQuantities,
+      liquidity
+    );
+
+    // In a complete market, winning shares are worth $1 each
+    return shares.toFixed(2);
+  };
+
+  const potentialWin = calculatePotentialWin();
+
+  // Initialize market if needed
+  useEffect(() => {
+    if (showDashboard && marketQuantities[0] === 0 && marketQuantities[1] === 0) {
+      // Initialize with 50/50 odds (both quantities at 0)
+      setMarketQuantities(initializeMarket(2, liquidity));
+    }
+  }, [showDashboard, marketQuantities, liquidity]);
 
   useEffect(() => {
     setTotalVotes(yesVotes + noVotes)
@@ -264,36 +312,56 @@ export default function ClaimVerifier() {
     setSelectedPosition(position)
   }
 
-  // Handle the actual purchase
+  // Update the handleBuyPosition function to use LMSR
   const handleBuyPosition = () => {
-    if (!selectedPosition) return
+    if (!selectedPosition) return;
 
-    // Update vote counts
-    if (selectedPosition === 'yes') {
-      setYesVotes(prev => prev + 1)
-    } else {
-      setNoVotes(prev => prev + 1)
-    }
+    // Determine outcome index (0 for yes, 1 for no)
+    const outcomeIndex = selectedPosition === 'yes' ? 0 : 1;
 
-    // Calculate price and quantity
-    const price = selectedPosition === 'yes' ? Number(yesPrice) : Number(noPrice)
-    const quantity = Math.floor(Number(betAmount) / price * 100) // Convert to shares (cents)
+    // Amount to spend
+    const amount = Number(betAmount);
+    if (amount <= 0) return;
+
+    // Calculate shares to buy with this amount
+    const shares = calculateSharesToBuy(
+      outcomeIndex,
+      amount,
+      marketQuantities,
+      liquidity
+    );
+
+    // Calculate actual cost (might be slightly less than amount due to rounding)
+    const actualCost = calculateCostToBuy(
+      outcomeIndex,
+      shares,
+      marketQuantities,
+      liquidity
+    );
+
+    // Update market quantities
+    const newQuantities = [...marketQuantities];
+    newQuantities[outcomeIndex] += shares;
+    setMarketQuantities(newQuantities);
+
+    // Update market volume
+    setMarketVolume(prev => prev + actualCost);
 
     // Add to positions
     setUserPositions(prev => [
       ...prev,
       {
         type: selectedPosition,
-        amount: Number(betAmount),
-        price,
-        quantity
+        amount: actualCost,
+        price: Number(selectedPosition === 'yes' ? yesPrice : noPrice),
+        quantity: shares
       }
-    ])
+    ]);
 
     // Reset bet amount and selected position
-    setBetAmount("1")
-    setSelectedPosition(null)
-  }
+    setBetAmount("1");
+    setSelectedPosition(null);
+  };
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -566,26 +634,12 @@ export default function ClaimVerifier() {
                   </div>
                 </div>
 
-                {/* Chart */}
-                <div className="relative h-40 mb-6">
-                  <div className="absolute top-0 right-0 text-sm text-gray-500">90%</div>
-                  <div className="absolute top-1/2 right-0 transform -translate-y-1/2 text-sm text-gray-500">50%</div>
-                  <div className="absolute bottom-0 right-0 text-sm text-gray-500">10%</div>
-
-                  <div className="h-full w-full flex items-end">
-                    {chartData.map((value, index) => (
-                      <div
-                        key={index}
-                        className="w-full h-full flex items-end"
-                        style={{ width: `${100 / chartData.length}%` }}
-                      >
-                        <div
-                          className="w-full bg-blue-500"
-                          style={{ height: `${getHeight(value)}%` }}
-                        ></div>
-                      </div>
-                    ))}
-                  </div>
+                {/* Price Chart */}
+                <div className="mt-6">
+                  <PriceChart
+                    currentProbability={yesProbability}
+                    outcome={yesProbability >= 50 ? 'yes' : 'no'}
+                  />
                 </div>
 
                 {/* Time period tabs */}
