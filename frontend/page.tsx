@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, CheckCircle, XCircle, CircleHelp, Clock, ChevronDown, Upload, X, ImageIcon, Calendar } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, CircleHelp, Clock, ChevronDown, Upload, X, ImageIcon, Calendar, ShieldCheck, Users } from "lucide-react"
 import TruthOrb from "./truth-orb"
 import axios from "axios"
 import LogDisplay from './components/LogDisplay'
@@ -67,6 +67,7 @@ export default function ClaimVerifier() {
   const [expiry, setExpiry] = useState("")
 
   const [showDashboard, setShowDashboard] = useState(false)
+  const [activeView, setActiveView] = useState<'user' | 'admin'>('user')
   const [isVerifying, setIsVerifying] = useState(false)
   const [result, setResult] = useState<null | {
     decision: "true" | "false" | "depends" | "inconclusive" | "too_early"
@@ -300,13 +301,36 @@ export default function ClaimVerifier() {
             </h1>
           </div>
 
+          {showDashboard && (
+            <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-1">
+              <button
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeView === 'user' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => setActiveView('user')}
+              >
+                <Users className="h-4 w-4 inline mr-1" />
+                User View
+              </button>
+              <button
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeView === 'admin' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+                onClick={() => setActiveView('admin')}
+              >
+                <ShieldCheck className="h-4 w-4 inline mr-1" />
+                Admin View
+              </button>
+            </div>
+          )}
+
           <div className="flex space-x-1">
             <div className="text-green-400">$0.00</div>
             <div className="text-green-400 mr-2">$0.00</div>
             <Button variant="default" className="bg-blue-500 hover:bg-blue-600">Deposit</Button>
           </div>
         </div>
-          </header>
+      </header>
 
       {/* Categories navbar */}
       <div className="bg-[#1A202C] border-b border-gray-800 px-4">
@@ -561,231 +585,238 @@ export default function ClaimVerifier() {
               </div>
 
               {/* Trading Panel */}
-              <div className="bg-gray-900 rounded-lg shadow-xl">
-                <div className="border-b border-gray-800 px-6 py-4">
-                  <div className="flex space-x-2">
-                    <button
-                      className={`text-lg font-medium pb-2 ${tradeTab === 'buy' ? 'border-b-2 border-white' : 'text-gray-500'}`}
-                      onClick={() => setTradeTab('buy')}
-                    >
-                      Buy
-                    </button>
-                    <button
-                      className={`text-lg font-medium pb-2 ${tradeTab === 'sell' ? 'border-b-2 border-white' : 'text-gray-500'}`}
-                      onClick={() => setTradeTab('sell')}
-                    >
-                      Sell
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  {/* User Position - shown when they have a position */}
-                  {userPositions.length > 0 && (
-                    <div className="mb-6 border border-gray-700 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="text-gray-400">Your Position</div>
-                        <div className={position.type === 'yes' ? 'text-green-400' : 'text-orange-400'}>
-                          {position.type === 'yes' ? 'YES' : 'NO'}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 mb-2">
-                        <div>
-                          <div className="text-gray-500 text-sm">Amount</div>
-                          <div className="text-white font-medium">${position.total.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500 text-sm">Potential Profit</div>
-                          <div className="text-green-400 font-medium">${position.potential.toFixed(2)}</div>
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-gray-500">
-                        Qty: {userPositions.reduce((sum, p) => sum + p.quantity, 0)} shares
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Yes/No buttons - standard layout if in Buy tab */}
-                  {tradeTab === 'buy' && (
-                    <div className="grid grid-cols-2 gap-3 mb-6">
+              {activeView === 'user' && (
+                <div className="bg-gray-900 rounded-lg shadow-xl">
+                  <div className="border-b border-gray-800 px-6 py-4">
+                    <div className="flex space-x-2">
                       <button
-                        className="bg-blue-600 hover:bg-blue-700 rounded-md p-4 flex items-center justify-center font-medium"
-                        onClick={() => handleVote('yes')}
+                        className={`text-lg font-medium pb-2 ${tradeTab === 'buy' ? 'border-b-2 border-white' : 'text-gray-500'}`}
+                        onClick={() => setTradeTab('buy')}
                       >
-                        Yes {yesPrice}¢
+                        Buy
                       </button>
                       <button
-                        className="bg-orange-500 hover:bg-orange-600 rounded-md p-4 flex items-center justify-center font-medium"
+                        className={`text-lg font-medium pb-2 ${tradeTab === 'sell' ? 'border-b-2 border-white' : 'text-gray-500'}`}
+                        onClick={() => setTradeTab('sell')}
+                      >
+                        Sell
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    {/* User Position - shown when they have a position */}
+                    {userPositions.length > 0 && (
+                      <div className="mb-6 border border-gray-700 rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="text-gray-400">Your Position</div>
+                          <div className={position.type === 'yes' ? 'text-green-400' : 'text-orange-400'}>
+                            {position.type === 'yes' ? 'YES' : 'NO'}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mb-2">
+                          <div>
+                            <div className="text-gray-500 text-sm">Amount</div>
+                            <div className="text-white font-medium">${position.total.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500 text-sm">Potential Profit</div>
+                            <div className="text-green-400 font-medium">${position.potential.toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-gray-500">
+                          Qty: {userPositions.reduce((sum, p) => sum + p.quantity, 0)} shares
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Yes/No buttons - standard layout if in Buy tab */}
+                    {tradeTab === 'buy' && (
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <button
+                          className="bg-blue-600 hover:bg-blue-700 rounded-md p-4 flex items-center justify-center font-medium"
+                          onClick={() => handleVote('yes')}
+                        >
+                          Yes {yesPrice}¢
+                        </button>
+                        <button
+                          className="bg-orange-500 hover:bg-orange-600 rounded-md p-4 flex items-center justify-center font-medium"
+                          onClick={() => handleVote('no')}
+                        >
+                          No {noPrice}¢
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Sell buttons - if in Sell tab and has positions */}
+                    {tradeTab === 'sell' && userPositions.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <button
+                          className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
+                          disabled={!userPositions.some(p => p.type === 'yes')}
+                        >
+                          Sell Yes
+                        </button>
+                        <button
+                          className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
+                          disabled={!userPositions.some(p => p.type === 'no')}
+                        >
+                          Sell No
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Amount */}
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-400">Amount</span>
+                        <span className="text-4xl">${betAmount}</span>
+                      </div>
+                      <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
+
+                      {/* Amount buttons */}
+                      <div className="grid grid-cols-4 gap-2 mb-6">
+                        <button
+                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                          onClick={() => handleAmountChange("1")}
+                        >
+                          +$1
+                        </button>
+                        <button
+                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                          onClick={() => handleAmountChange("20")}
+                        >
+                          +$20
+                        </button>
+                        <button
+                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                          onClick={() => handleAmountChange("100")}
+                        >
+                          +$100
+                        </button>
+                        <button
+                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                          onClick={() => handleAmountChange("500")}
+                        >
+                          Max
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* To win */}
+                    {tradeTab === 'buy' && (
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <div className="flex items-center">
+                            <span className="text-lg">To win</span>
+                            <span className="text-green-400 ml-1">💰</span>
+                          </div>
+                          <div className="text-sm text-gray-500">Avg. Price {yesPrice}¢</div>
+                        </div>
+                        <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
+                      </div>
+                    )}
+
+                    {/* CTA Button */}
+                    {tradeTab === 'buy' ? (
+                      <button
+                        className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-md font-medium"
                         onClick={() => handleVote('no')}
                       >
-                        No {noPrice}¢
+                        Buy No
                       </button>
-                    </div>
-                  )}
+                    ) : (
+                      <button
+                        className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-md font-medium"
+                        disabled={userPositions.length === 0}
+                      >
+                        Sell Position
+                      </button>
+                    )}
 
-                  {/* Sell buttons - if in Sell tab and has positions */}
-                  {tradeTab === 'sell' && userPositions.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <button
-                        className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
-                        disabled={!userPositions.some(p => p.type === 'yes')}
-                      >
-                        Sell Yes
-                      </button>
-                      <button
-                        className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
-                        disabled={!userPositions.some(p => p.type === 'no')}
-                      >
-                        Sell No
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Amount */}
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-gray-400">Amount</span>
-                      <span className="text-4xl">${betAmount}</span>
-                    </div>
-                    <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
-
-                    {/* Amount buttons */}
-                    <div className="grid grid-cols-4 gap-2 mb-6">
-                      <button
-                        className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                        onClick={() => handleAmountChange("1")}
-                      >
-                        +$1
-                      </button>
-                      <button
-                        className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                        onClick={() => handleAmountChange("20")}
-                      >
-                        +$20
-                      </button>
-                      <button
-                        className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                        onClick={() => handleAmountChange("100")}
-                      >
-                        +$100
-                      </button>
-                      <button
-                        className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                        onClick={() => handleAmountChange("500")}
-                      >
-                        Max
-                      </button>
+                    <div className="text-center text-sm text-gray-500 mt-4">
+                      By trading, you agree to the Terms of Use.
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* To win */}
-                  {tradeTab === 'buy' && (
-                    <div className="flex justify-between items-center mb-6">
-                      <div>
-                        <div className="flex items-center">
-                          <span className="text-lg">To win</span>
-                          <span className="text-green-400 ml-1">💰</span>
-                        </div>
-                        <div className="text-sm text-gray-500">Avg. Price {yesPrice}¢</div>
-                      </div>
-                      <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
-                    </div>
-                  )}
-
-                  {/* CTA Button */}
-                  {tradeTab === 'buy' ? (
-                    <button
-                      className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-md font-medium"
-                      onClick={() => handleVote('no')}
-                    >
-                      Buy No
-                    </button>
-                  ) : (
-                    <button
-                      className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-md font-medium"
-                      disabled={userPositions.length === 0}
-                    >
-                      Sell Position
-                    </button>
-                  )}
-
-                  <div className="text-center text-sm text-gray-500 mt-4">
-                    By trading, you agree to the Terms of Use.
+              {/* Admin View - Verification Panel */}
+              {activeView === 'admin' && (
+                <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
+                  <div className="flex items-center mb-3">
+                    <span className="bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full mr-2">
+                      Admin Only
+                    </span>
+                    <h3 className="text-lg font-medium">Market Verification</h3>
                   </div>
-                </div>
-              </div>
+                  <p className="text-gray-400 mb-6">
+                    Use AI verification to analyze this claim and determine its factual accuracy.
+                    Verification results will be visible to all market participants.
+                  </p>
 
-              {/* Verification Button - Now with Admin view label */}
-              <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
-                <div className="flex items-center mb-3">
-                  <span className="bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full mr-2">
-                    Admin view
-                  </span>
-                  <h3 className="text-lg font-medium">Verify This Claim</h3>
-                </div>
-                <p className="text-gray-400 mb-4">Analyze this claim and determine its factual accuracy</p>
-
-                <Button
-                  onClick={handleVerify}
-                  disabled={isVerifying}
-                  className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                  <Button
+                    onClick={handleVerify}
+                    disabled={isVerifying}
+                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
                   >
                     {isVerifying ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
+                        Verifying...
                       </>
                     ) : (
-                    "Start Verification"
+                      "Start Verification"
                     )}
                   </Button>
-            </div>
+                </div>
+              )}
 
-              {/* Verification Result */}
-            {result && (
-              <div className="relative">
-                <div
+              {/* Verification Result - Shown in both views */}
+              {result && (
+                <div className="relative">
+                  <div
                     className={`absolute -inset-0.5 rounded-lg blur opacity-30 ${
-                    color[result.decision]
-                  }`}
-                ></div>
-                <div className="relative bg-gray-900 rounded-lg p-6 shadow-xl">
-                  <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold">{result.decision.toUpperCase()}</h3>
-                    <div className="mt-2 flex justify-center">
-                      <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-800">
-                        <div className="mr-2">Confidence:</div>
-                        <div className="h-2 w-24 bg-gray-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${bgColor[result.decision]}`}
-                            style={{ width: `${result.confidence}%` }}
-                          ></div>
+                      color[result.decision]
+                    }`}
+                  ></div>
+                  <div className="relative bg-gray-900 rounded-lg p-6 shadow-xl">
+                    <div className="text-center mb-4">
+                      <h3 className="text-2xl font-bold">{result.decision.toUpperCase()}</h3>
+                      <div className="mt-2 flex justify-center">
+                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-800">
+                          <div className="mr-2">Confidence:</div>
+                          <div className="h-2 w-24 bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${bgColor[result.decision]}`}
+                              style={{ width: `${result.confidence}%` }}
+                            ></div>
+                          </div>
+                          <div className="ml-2 font-medium">{result.confidence}%</div>
                         </div>
-                        <div className="ml-2 font-medium">{result.confidence}%</div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center">
-                      {circle[result.decision]}
+                    <div className="flex items-center justify-center mb-4">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center">
+                        {circle[result.decision]}
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                      <p className="text-gray-300 text-left">{result.reason}</p>
                     </div>
                   </div>
-
-                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <p className="text-gray-300 text-left">{result.reason}</p>
-                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Log Display */}
+              {/* Log Display - Shown in both views */}
               {(isVerifying || logs.length > 0) && (
-            <div className="mb-6">
+                <div className="mb-6">
                   <h2 className="text-lg font-medium mb-2">Verification Process Logs</h2>
-              <LogDisplay logs={logs} />
+                  <LogDisplay logs={logs} />
                 </div>
               )}
             </div>
