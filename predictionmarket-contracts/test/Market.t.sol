@@ -50,13 +50,16 @@ contract MarketTest is Test {
     function testMarketCreation() public {
         string memory question = "Will ETH reach $5k in 2024?";
         uint256 endTime = block.timestamp + 7 days;
+        string memory details = "Details about the market";
+        string memory imageUrl = "https://api.example.com/image.png";
         string memory resolverUrl = "https://api.example.com/eth-price";
 
         vm.startPrank(creator);
         uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
             question,
+            details,
             endTime,
-            resolverUrl,
+            imageUrl,
             address(resolver)
         );
         vm.stopPrank();
@@ -74,12 +77,15 @@ contract MarketTest is Test {
         // Create market first
         string memory question = "Will ETH reach $5k in 2024?";
         uint256 endTime = block.timestamp + 7 days;
+        string memory details = "Details about the market";
+        string memory imageUrl = "https://api.example.com/image.png";
 
         vm.startPrank(creator);
         uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
             question,
+            details,
             endTime,
-            "https://api.example.com/eth-price",
+            imageUrl,
             address(resolver)
         );
         vm.stopPrank();
@@ -218,13 +224,15 @@ contract MarketTest is Test {
         // 1. Market Creation
         string memory question = "Will ETH reach $5k in 2024?";
         uint256 endTime = block.timestamp + 7 days;
-        string memory resolverUrl = "https://api.example.com/eth-price";
+        string memory details = "Details about the market";
+        string memory imageUrl = "https://api.example.com/image.png";
 
         vm.startPrank(creator);
         uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
             question,
+            details,
             endTime,
-            resolverUrl,
+            imageUrl,
             address(resolver)
         );
         vm.stopPrank();
@@ -421,16 +429,294 @@ contract MarketTest is Test {
         market.claimWinnings();
     }
 
+    function testPriceManipulationResistance() public {
+        setupInitializedMarket();
+
+        // Record initial prices
+        (uint256 initialYesPrice, uint256 initialNoPrice) = market
+            .getCurrentPrices();
+
+        // User1 attempts to manipulate price with a series of trades
+        vm.startPrank(user1);
+
+        // First large buy to move price
+        market.buyShares{value: 3 ether}(true);
+        (uint256 yesPrice1, ) = market.getCurrentPrices();
+        assertTrue(
+            yesPrice1 > initialYesPrice,
+            "Price should increase after large buy"
+        );
+
+        // Partial sell to try to manipulate
+        (uint256 yesShares, ) = market.getPosition(user1);
+        market.sellShares(true, yesShares / 2);
+        (uint256 yesPrice2, ) = market.getCurrentPrices();
+        assertTrue(yesPrice2 < yesPrice1, "Price should decrease after sell");
+
+        // Try to buy again at "lower" price
+        market.buyShares{value: 1 ether}(true);
+        vm.stopPrank();
+
+        // Verify price stabilizes near original after multiple trades
+        (uint256 finalYesPrice, uint256 finalNoPrice) = market
+            .getCurrentPrices();
+        assertTrue(
+            abs(int256(finalYesPrice) - int256(initialYesPrice)) <
+                (market.PRECISION() * 4) / 10,
+            "Price should remain within reasonable bounds after manipulation attempts"
+        );
+    }
+
+    function testMinimumLiquidityEdgeCases() public {
+        setupInitializedMarket();
+
+        // Try to buy very small amount of shares
+        vm.startPrank(user1);
+        vm.expectRevert("Amount too small");
+        market.buyShares{value: 1000 wei}(true);
+
+        // Buy minimum valid amount
+        market.buyShares{value: MIN_LIQUIDITY}(true);
+        (uint256 minShares, ) = market.getPosition(user1);
+        assertTrue(minShares > 0, "Should get some shares for minimum amount");
+
+        // Try to sell very small amount
+        vm.expectRevert("Amount too small");
+        market.sellShares(true, minShares / 100);
+
+        // Sell all shares
+        market.sellShares(true, minShares);
+        (uint256 finalShares, ) = market.getPosition(user1);
+        assertEq(finalShares, 0, "Should be able to sell all shares");
+        vm.stopPrank();
+
+        // Verify market still functions after min amount trades
+        (uint256 yesPrice, uint256 noPrice) = market.getCurrentPrices();
+        assertTrue(
+            yesPrice > 0 && noPrice > 0,
+            "Market should maintain valid prices"
+        );
+    }
+
+    function testExtremePriceScenarios() public {
+        setupInitializedMarket();
+
+        // Try to push YES price very close to 100%
+        vm.startPrank(user1);
+        for (uint i = 0; i < 5; i++) {
+            market.buyShares{value: 1 ether}(true);
+            (uint256 yesPrice, uint256 noPrice) = market.getCurrentPrices();
+
+            // Verify prices remain valid
+            assertTrue(
+                yesPrice <= market.PRECISION(),
+                "YES price should not exceed 100%"
+            );
+            assertTrue(noPrice > 0, "NO price should never reach 0");
+            assertTrue(
+                yesPrice + noPrice == market.PRECISION(),
+                "Prices should sum to PRECISION"
+            );
+        }
+        vm.stopPrank();
+
+        // Try to push NO price very close to 100%
+        vm.startPrank(user2);
+        for (uint i = 0; i < 5; i++) {
+            market.buyShares{value: 1 ether}(false);
+            (uint256 yesPrice, uint256 noPrice) = market.getCurrentPrices();
+
+            // Verify prices remain valid
+            assertTrue(
+                noPrice <= market.PRECISION(),
+                "NO price should not exceed 100%"
+            );
+            assertTrue(yesPrice > 0, "YES price should never reach 0");
+            assertTrue(
+                yesPrice + noPrice == market.PRECISION(),
+                "Prices should sum to PRECISION"
+            );
+        }
+        vm.stopPrank();
+
+        // Verify market can still be resolved correctly at extreme prices
+        vm.warp(block.timestamp + 8 days);
+        vm.prank(agent);
+        resolver.resolveMarket(address(market), true);
+
+        // Both YES and NO holders should be able to claim based on their positions
+        vm.prank(user1);
+        market.claimWinnings();
+
+        vm.expectRevert("No winnings to claim");
+        vm.prank(user2);
+        market.claimWinnings();
+    }
+
+    function testFlashLoanAttackScenario() public {
+        setupInitializedMarket();
+
+        // Simulate flash loan by giving user a large but reasonable balance
+        vm.deal(user1, 100 ether);
+
+        // Record initial state and balance
+        uint256 initialBalance = user1.balance;
+        (uint256 initialYesPrice, ) = market.getCurrentPrices();
+
+        // Attempt sandwich attack:
+        vm.startPrank(user1);
+
+        // Step 1: Initial smaller buy to establish baseline
+        market.buyShares{value: 1 ether}(true);
+
+        // Step 2: Large buy to move price significantly
+        market.buyShares{value: 3 ether}(true);
+        (uint256 yesShares, ) = market.getPosition(user1);
+
+        // Record intermediate price
+        (uint256 peakPrice, ) = market.getCurrentPrices();
+        assertTrue(
+            peakPrice > initialYesPrice,
+            "Price should increase after large buy"
+        );
+
+        // Step 3: Sell all shares quickly
+        market.sellShares(true, yesShares);
+
+        // Step 4: Wait a block to avoid high sandwich fees
+        vm.roll(block.number + 1);
+
+        // Step 5: Try another trade to test recovery
+        market.buyShares{value: 1 ether}(true);
+        (yesShares, ) = market.getPosition(user1);
+        market.sellShares(true, yesShares);
+
+        // Calculate total loss
+        uint256 totalLoss = initialBalance - user1.balance;
+        assertTrue(
+            totalLoss > 0.1 ether,
+            "Flash loan attack should result in significant loss due to fees and slippage"
+        );
+
+        // Get final price and verify recovery
+        (uint256 finalYesPrice, ) = market.getCurrentPrices();
+
+        // Check if price has moved back towards initial price
+        uint256 priceDeviation = abs(
+            int256(finalYesPrice) - int256(initialYesPrice)
+        );
+        assertTrue(
+            priceDeviation < market.PRECISION() / 2,
+            "Market should recover towards initial price after attack"
+        );
+
+        vm.stopPrank();
+    }
+
+    function testRoundingErrorsAndPrecision() public {
+        setupInitializedMarket();
+
+        // Test very small trades near precision limits
+        vm.startPrank(user1);
+
+        // First, add some liquidity to ensure enough depth
+        market.buyShares{value: 1 ether}(true);
+
+        // Now test minimum trade size
+        uint256 minTradeSize = 1e13; // MIN_TRADE_SIZE = 0.00001 ether
+
+        // Buy enough shares to ensure we can sell above minimum
+        market.buyShares{value: minTradeSize * 10}(true);
+        (uint256 initialShares, ) = market.getPosition(user1);
+        assertTrue(
+            initialShares >= minTradeSize,
+            "Should receive sufficient shares for minimum trade"
+        );
+
+        // Try to sell exactly minimum trade size
+        market.sellShares(true, minTradeSize);
+
+        // Verify remaining position
+        (uint256 finalShares, ) = market.getPosition(user1);
+        assertTrue(
+            finalShares > 0 && finalShares < initialShares,
+            "Should have remaining shares after partial sell"
+        );
+
+        // Verify prices maintain precision
+        (uint256 yesPrice, uint256 noPrice) = market.getCurrentPrices();
+        assertEq(
+            yesPrice + noPrice,
+            market.PRECISION(),
+            "Prices should sum to PRECISION even with small trades"
+        );
+
+        // Try to sell remaining shares
+        market.sellShares(true, finalShares);
+
+        // Verify position is cleared
+        (uint256 endShares, ) = market.getPosition(user1);
+        assertEq(endShares, 0, "Should be able to sell all remaining shares");
+
+        vm.stopPrank();
+    }
+
+    function testMaximumLiquidityScenarios() public {
+        setupInitializedMarket();
+
+        // Add large but reasonable liquidity to test upper bounds
+        vm.deal(user1, 1000 ether);
+        vm.startPrank(user1);
+
+        // Large YES position - using 100 ETH instead of 100,000
+        market.buyShares{value: 100 ether}(true);
+
+        // Record state after large liquidity
+        (uint256 yesPrice1, uint256 noPrice1) = market.getCurrentPrices();
+        assertTrue(
+            yesPrice1 + noPrice1 == market.PRECISION(),
+            "Prices should sum to PRECISION with large liquidity"
+        );
+
+        // Try small trade after large liquidity
+        vm.startPrank(user2);
+        market.buyShares{value: 0.1 ether}(false);
+
+        // Verify small trades still possible
+        (, uint256 noShares) = market.getPosition(user2);
+        assertTrue(
+            noShares > 0,
+            "Should be able to make small trades with large liquidity"
+        );
+
+        // Verify price impact is small due to large liquidity
+        (uint256 yesPrice2, uint256 noPrice2) = market.getCurrentPrices();
+        assertTrue(
+            abs(int256(yesPrice2) - int256(yesPrice1)) <
+                market.PRECISION() / 100,
+            "Large liquidity should minimize price impact"
+        );
+        vm.stopPrank();
+    }
+
+    // Helper function for absolute value
+    function abs(int256 x) internal pure returns (uint256) {
+        return x >= 0 ? uint256(x) : uint256(-x);
+    }
+
     // Helper function to setup a market with initial liquidity
     function setupInitializedMarket() internal {
         string memory question = "Will ETH reach $5k in 2024?";
         uint256 endTime = block.timestamp + 7 days;
+        string memory details = "Details about the market";
+        string memory imageUrl = "https://api.example.com/image.png";
 
         vm.prank(creator);
         uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
             question,
+            details,
             endTime,
-            "https://api.example.com/eth-price",
+            imageUrl,
             address(resolver)
         );
 
