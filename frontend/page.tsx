@@ -142,6 +142,43 @@ export default function ClaimVerifier() {
     setShowDashboard(true)
   }
 
+  // Add state for resolved positions
+  const [isMarketResolved, setIsMarketResolved] = useState(false)
+  const [resolvedOutcome, setResolvedOutcome] = useState<'yes' | 'no' | null>(null)
+
+  // Track total winnings
+  const [totalWinnings, setTotalWinnings] = useState(0)
+
+  // Function to resolve market based on verification result
+  const resolveMarket = (decision: string) => {
+    // Map verification decision to market outcome
+    let outcome: 'yes' | 'no' | null = null;
+
+    if (decision === 'true') {
+      outcome = 'yes';
+    } else if (decision === 'false') {
+      outcome = 'no';
+    } else {
+      // For inconclusive/depends/too_early, we could implement different resolution rules
+      // Here we're just returning stakes as a simple implementation
+      return;
+    }
+
+    setResolvedOutcome(outcome);
+    setIsMarketResolved(true);
+
+    // Calculate winnings
+    let winnings = 0;
+    userPositions.forEach(position => {
+      if (position.type === outcome) {
+        // Winners get their stake plus winnings based on the price
+        winnings += position.amount / position.price;
+      }
+    });
+
+    setTotalWinnings(winnings);
+  };
+
   const handleVerify = async () => {
     if (!claim.trim()) return
 
@@ -153,11 +190,17 @@ export default function ClaimVerifier() {
       // Start verification
       const aggregator = await verifyClaimWithProgress(claim, setLogs);
 
-      setResult({
+      const result = {
         decision: aggregator.decision,
         confidence: aggregator.confidence,
         reason: aggregator.reason,
-      });
+      };
+
+      setResult(result);
+
+      // Resolve market based on verification result
+      resolveMarket(result.decision);
+
     } catch (e: any) {
       console.error('Error verifying claim:', e);
       setLogs(prev => [...prev, `[error] Error verifying claim: ${e.message}`]);
@@ -252,73 +295,14 @@ export default function ClaimVerifier() {
     setSelectedPosition(null)
   }
 
-  // Calculate total position value
-  const calculateTotalPosition = () => {
-    if (userPositions.length === 0) return { total: 0, potential: 0, type: null }
-
-    const yesPositions = userPositions.filter(p => p.type === 'yes')
-    const noPositions = userPositions.filter(p => p.type === 'no')
-
-    const yesAmount = yesPositions.reduce((sum, p) => sum + p.amount, 0)
-    const noAmount = noPositions.reduce((sum, p) => sum + p.amount, 0)
-
-    let type: 'yes' | 'no' | null = null
-    let total = 0
-    let potential = 0
-
-    if (yesAmount > noAmount) {
-      type = 'yes'
-      total = yesAmount - noAmount
-      // Calculate potential winnings using current probability
-      potential = total / Number(yesPrice)
-    } else if (noAmount > yesAmount) {
-      type = 'no'
-      total = noAmount - yesAmount
-      potential = total / Number(noPrice)
-    } else {
-      type = null
-      total = 0
-      potential = 0
-    }
-
-    return { total, potential, type }
-  }
-
-  const position = calculateTotalPosition()
-
-  // Handle direct amount input
-  const handleAmountInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Extract numeric value
-    const value = e.target.value.replace(/[^0-9.]/g, '')
-
-    // Handle decimal points properly (only one allowed)
-    if (value.split('.').length > 2) {
-      return
-    }
-
-    // Limit to 2 decimal places and valid amount
-    const parts = value.split('.')
-    if (parts.length > 1 && parts[1].length > 2) {
-      return
-    }
-
-    // Update amount
-    setBetAmount(value)
-  }
-
-  // Handle amount button clicks
-  const handleAmountChange = (amount: string) => {
-    // For "Max", we'd normally calculate based on user balance, but for now just set a reasonable max
-    if (amount === "max") {
-      setBetAmount("14.00")
-      return
-    }
-
-    // Otherwise add the amount to the current bet
-    const currentAmount = Number(betAmount) || 0
-    const newAmount = (currentAmount + Number(amount)).toFixed(2)
-    setBetAmount(newAmount)
-  }
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
 
   // Mock data for chart
   const generateMockChartData = () => {
@@ -509,7 +493,7 @@ export default function ClaimVerifier() {
           {/* Market Display */}
           {showDashboard && (
             <div className="space-y-8">
-              {/* Market Header */}
+              {/* Market Header - Add resolved status */}
               <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
                 <div className="flex flex-col md:flex-row gap-6">
                   {/* Left column with image */}
@@ -541,6 +525,25 @@ export default function ClaimVerifier() {
                     {details && (
                       <div className="mb-4 bg-gray-800 p-4 rounded-md border border-gray-700">
                         <p className="text-gray-300 whitespace-pre-line">{details}</p>
+                      </div>
+                    )}
+
+                    {/* Add market resolution banner when resolved */}
+                    {isMarketResolved && resolvedOutcome && (
+                      <div className={`mb-4 p-3 rounded-md text-white flex items-center justify-between ${
+                        resolvedOutcome === 'yes' ? 'bg-green-600' : 'bg-red-600'
+                      }`}>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          <span className="font-medium">
+                            Market resolved: {resolvedOutcome === 'yes' ? 'YES' : 'NO'}
+                          </span>
+                        </div>
+                        {totalWinnings > 0 && (
+                          <div className="text-white font-bold">
+                            You won: {formatCurrency(totalWinnings)}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -655,167 +658,208 @@ export default function ClaimVerifier() {
                   </div>
 
                   <div className="p-6">
-                    {/* User Position - shown when they have a position */}
+                    {/* User Positions - Updated to show resolution status */}
                     {userPositions.length > 0 && (
-                      <div className="mb-6 border border-gray-700 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <div className="text-gray-400">Your Position</div>
-                          <div className={position.type === 'yes' ? 'text-green-400' : 'text-orange-400'}>
-                            {position.type === 'yes' ? 'YES' : 'NO'}
-                          </div>
-                        </div>
+                      <div className="mb-6">
+                        <h3 className="text-lg font-medium mb-3">Your Positions</h3>
+                        <div className="space-y-2">
+                          {userPositions.map((position, index) => (
+                            <div
+                              key={index}
+                              className={`border rounded-lg p-4 ${
+                                isMarketResolved
+                                  ? position.type === resolvedOutcome
+                                    ? 'border-green-500 bg-green-900/20'
+                                    : 'border-red-500 bg-red-900/20'
+                                  : 'border-gray-700'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <div className="flex items-center">
+                                  <div className={`h-6 w-6 rounded-full mr-2 ${
+                                    position.type === 'yes' ? 'bg-green-500' : 'bg-red-500'
+                                  }`}></div>
+                                  <span className="font-medium">{position.type === 'yes' ? 'YES' : 'NO'}</span>
+                                </div>
+                                {isMarketResolved && (
+                                  <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                                    position.type === resolvedOutcome
+                                      ? 'bg-green-500/20 text-green-400'
+                                      : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {position.type === resolvedOutcome ? 'WON' : 'LOST'}
+                                  </div>
+                                )}
+                                <div className="text-sm text-gray-400">
+                                  {new Date().toLocaleDateString()}
+                                </div>
+                              </div>
 
-                        <div className="grid grid-cols-2 gap-3 mb-2">
-                          <div>
-                            <div className="text-gray-500 text-sm">Amount</div>
-                            <div className="text-white font-medium">${position.total.toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-500 text-sm">Potential Profit</div>
-                            <div className="text-green-400 font-medium">${position.potential.toFixed(2)}</div>
-                          </div>
-                        </div>
+                              <div className="grid grid-cols-3 gap-4 text-sm mb-1">
+                                <div>
+                                  <div className="text-gray-500">Amount</div>
+                                  <div className="font-medium">{formatCurrency(position.amount)}</div>
+                                </div>
+                                <div>
+                                  <div className="text-gray-500">Price</div>
+                                  <div className="font-medium">{position.price.toFixed(2)}¢</div>
+                                </div>
+                                <div>
+                                  <div className="text-gray-500">Shares</div>
+                                  <div className="font-medium">{position.quantity}</div>
+                                </div>
+                              </div>
 
-                        <div className="text-xs text-gray-500">
-                          Qty: {userPositions.reduce((sum, p) => sum + p.quantity, 0)} shares
+                              <div className="flex justify-between items-center mt-3">
+                                {isMarketResolved ? (
+                                  position.type === resolvedOutcome ? (
+                                    <div className="text-green-400 font-medium">
+                                      Won: {formatCurrency(position.amount / position.price)}
+                                    </div>
+                                  ) : (
+                                    <div className="text-red-400 font-medium">
+                                      Lost: {formatCurrency(position.amount)}
+                                    </div>
+                                  )
+                                ) : (
+                                  <>
+                                    <div className="text-gray-500 text-sm">Potential profit:</div>
+                                    <div className="text-green-400 font-medium">
+                                      {formatCurrency(position.amount / position.price)}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Yes/No buttons - Now they just highlight selection, not make purchase */}
-                    {tradeTab === 'buy' && (
-                      <div className="grid grid-cols-2 gap-3 mb-6">
-                        <button
-                          className={`rounded-md p-4 flex items-center justify-center font-medium ${
-                            selectedPosition === 'yes'
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-700 hover:bg-gray-600'
-                          }`}
-                          onClick={() => handleSelectPosition('yes')}
-                        >
-                          Yes {yesPrice}¢
-                        </button>
-                        <button
-                          className={`rounded-md p-4 flex items-center justify-center font-medium ${
-                            selectedPosition === 'no'
-                              ? 'bg-slate-600 text-white'
-                              : 'bg-gray-700 hover:bg-gray-600'
-                          }`}
-                          onClick={() => handleSelectPosition('no')}
-                        >
-                          No {noPrice}¢
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Sell buttons - if in Sell tab and has positions */}
-                    {tradeTab === 'sell' && userPositions.length > 0 && (
-                      <div className="grid grid-cols-2 gap-3 mb-6">
-                        <button
-                          className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
-                          disabled={!userPositions.some(p => p.type === 'yes')}
-                        >
-                          Sell Yes
-                        </button>
-                        <button
-                          className="bg-gray-700 hover:bg-gray-600 rounded-md p-4 flex items-center justify-center font-medium"
-                          disabled={!userPositions.some(p => p.type === 'no')}
-                        >
-                          Sell No
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Amount - updated to allow direct input */}
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-2">
-                        <span className="text-gray-400">Amount</span>
-                        <div className="relative">
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-medium text-gray-500 pl-2">$</span>
-                          <input
-                            type="text"
-                            value={betAmount}
-                            onChange={handleAmountInputChange}
-                            className="bg-transparent text-right text-4xl w-32 focus:outline-none"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
-
-                      {/* Amount buttons */}
-                      <div className="grid grid-cols-4 gap-2 mb-6">
-                        <button
-                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                          onClick={() => handleAmountChange("1")}
-                        >
-                          +$1
-                        </button>
-                        <button
-                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                          onClick={() => handleAmountChange("20")}
-                        >
-                          +$20
-                        </button>
-                        <button
-                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                          onClick={() => handleAmountChange("100")}
-                        >
-                          +$100
-                        </button>
-                        <button
-                          className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                          onClick={() => handleAmountChange("max")}
-                        >
-                          Max
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* To win - Only shown when a position is selected */}
-                    {tradeTab === 'buy' && selectedPosition && (
-                      <div className="flex justify-between items-center mb-6">
-                        <div>
-                          <div className="flex items-center">
-                            <span className="text-lg">To win</span>
-                            <span className="text-green-400 ml-1">💰</span>
+                    {/* Disable trading if market is resolved */}
+                    {!isMarketResolved ? (
+                      <>
+                        {/* Yes/No buttons */}
+                        {tradeTab === 'buy' && (
+                          <div className="grid grid-cols-2 gap-3 mb-6">
+                            <button
+                              className={`rounded-md p-4 flex items-center justify-center font-medium ${
+                                selectedPosition === 'yes'
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-gray-700 hover:bg-gray-600'
+                              }`}
+                              onClick={() => handleSelectPosition('yes')}
+                            >
+                              Yes {yesPrice}¢
+                            </button>
+                            <button
+                              className={`rounded-md p-4 flex items-center justify-center font-medium ${
+                                selectedPosition === 'no'
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-gray-700 hover:bg-gray-600'
+                              }`}
+                              onClick={() => handleSelectPosition('no')}
+                            >
+                              No {noPrice}¢
+                            </button>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Avg. Price {selectedPosition === 'yes' ? yesPrice : noPrice}¢
+                        )}
+
+                        {/* Amount - updated to allow direct input */}
+                        <div className="mb-4">
+                          <div className="flex justify-between mb-2">
+                            <span className="text-gray-400">Amount</span>
+                            <div className="relative">
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-medium text-gray-500 pl-2">$</span>
+                              <input
+                                type="text"
+                                value={betAmount}
+                                onChange={(e) => setBetAmount(e.target.value)}
+                                className="bg-transparent text-right text-4xl w-32 focus:outline-none"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
+
+                          {/* Amount buttons */}
+                          <div className="grid grid-cols-4 gap-2 mb-6">
+                            <button
+                              className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                              onClick={() => setBetAmount("1")}
+                            >
+                              +$1
+                            </button>
+                            <button
+                              className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                              onClick={() => setBetAmount("20")}
+                            >
+                              +$20
+                            </button>
+                            <button
+                              className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                              onClick={() => setBetAmount("100")}
+                            >
+                              +$100
+                            </button>
+                            <button
+                              className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
+                              onClick={() => setBetAmount("max")}
+                            >
+                              Max
+                            </button>
                           </div>
                         </div>
-                        <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
-                      </div>
-                    )}
 
-                    {/* Buy Button - Now shows the selected position */}
-                    {tradeTab === 'buy' ? (
-                      <button
-                        className={`w-full py-4 rounded-md font-medium ${
-                          selectedPosition
-                            ? 'bg-blue-500 hover:bg-blue-600'
-                            : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                        }`}
-                        onClick={handleBuyPosition}
-                        disabled={!selectedPosition}
-                      >
-                        {selectedPosition
-                          ? `Buy ${selectedPosition === 'yes' ? 'Yes' : 'No'}`
-                          : 'Select a position'
-                        }
-                      </button>
+                        {/* To win - Only shown when a position is selected */}
+                        {tradeTab === 'buy' && selectedPosition && (
+                          <div className="flex justify-between items-center mb-6">
+                            <div>
+                              <div className="flex items-center">
+                                <span className="text-lg">To win</span>
+                                <span className="text-green-400 ml-1">💰</span>
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Avg. Price {selectedPosition === 'yes' ? yesPrice : noPrice}¢
+                              </div>
+                            </div>
+                            <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
+                          </div>
+                        )}
+
+                        {/* Buy Button - Now shows the selected position */}
+                        {tradeTab === 'buy' ? (
+                          <button
+                            className={`w-full py-4 rounded-md font-medium ${
+                              selectedPosition
+                                ? 'bg-blue-500 hover:bg-blue-600'
+                                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                            }`}
+                            onClick={handleBuyPosition}
+                            disabled={!selectedPosition}
+                          >
+                            {selectedPosition
+                              ? `Buy ${selectedPosition === 'yes' ? 'Yes' : 'No'}`
+                              : 'Select a position'
+                            }
+                          </button>
+                        ) : (
+                          <button
+                            className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-md font-medium"
+                            disabled={userPositions.length === 0}
+                          >
+                            Sell Position
+                          </button>
+                        )}
+                      </>
                     ) : (
-                      <button
-                        className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-md font-medium"
-                        disabled={userPositions.length === 0}
-                      >
-                        Sell Position
-                      </button>
+                      <div className="text-center p-4 mb-4 border border-gray-700 rounded-lg">
+                        <p className="text-lg font-medium mb-2">Market Resolved</p>
+                        <p className="text-gray-400">
+                          This market has been resolved and trading is no longer available.
+                        </p>
+                      </div>
                     )}
-
-                    <div className="text-center text-sm text-gray-500 mt-4">
-                      By trading, you agree to the Terms of Use.
-                    </div>
                   </div>
                 </div>
               )}
