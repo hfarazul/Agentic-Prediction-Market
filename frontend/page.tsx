@@ -92,12 +92,23 @@ export default function ClaimVerifier() {
   // Track active trade tab
   const [tradeTab, setTradeTab] = useState<'buy' | 'sell'>('buy')
 
+  // Add state for selected position
+  const [selectedPosition, setSelectedPosition] = useState<'yes' | 'no' | null>(null)
+
   // Calculate probabilities and prices
   const yesProbability = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 50
   const noProbability = totalVotes > 0 ? 100 - yesProbability : 50
   const yesPrice = (yesProbability / 100).toFixed(2)
   const noPrice = (noProbability / 100).toFixed(2)
-  const potentialWin = (Number(betAmount) / Number(yesPrice)).toFixed(2)
+
+  // Calculate potential winnings based on selected position
+  const calculatePotentialWin = () => {
+    if (!selectedPosition) return "0.00"
+    const price = selectedPosition === 'yes' ? Number(yesPrice) : Number(noPrice)
+    return (Number(betAmount) / price).toFixed(2)
+  }
+
+  const potentialWin = calculatePotentialWin()
 
   useEffect(() => {
     setTotalVotes(yesVotes + noVotes)
@@ -205,31 +216,40 @@ export default function ClaimVerifier() {
     }
   };
 
-  const handleVote = (type: 'yes' | 'no') => {
+  // Handle position selection
+  const handleSelectPosition = (position: 'yes' | 'no') => {
+    setSelectedPosition(position)
+  }
+
+  // Handle the actual purchase
+  const handleBuyPosition = () => {
+    if (!selectedPosition) return
+
     // Update vote counts
-    if (type === 'yes') {
+    if (selectedPosition === 'yes') {
       setYesVotes(prev => prev + 1)
     } else {
       setNoVotes(prev => prev + 1)
     }
 
     // Calculate price and quantity
-    const price = type === 'yes' ? Number(yesPrice) : Number(noPrice)
+    const price = selectedPosition === 'yes' ? Number(yesPrice) : Number(noPrice)
     const quantity = Math.floor(Number(betAmount) / price * 100) // Convert to shares (cents)
 
     // Add to positions
     setUserPositions(prev => [
       ...prev,
       {
-        type,
+        type: selectedPosition,
         amount: Number(betAmount),
         price,
         quantity
       }
     ])
 
-    // Reset bet amount
+    // Reset bet amount and selected position
     setBetAmount("1")
+    setSelectedPosition(null)
   }
 
   // Calculate total position value
@@ -266,9 +286,39 @@ export default function ClaimVerifier() {
 
   const position = calculateTotalPosition()
 
+  // Handle direct amount input
+  const handleAmountInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Extract numeric value
+    const value = e.target.value.replace(/[^0-9.]/g, '')
+
+    // Handle decimal points properly (only one allowed)
+    if (value.split('.').length > 2) {
+      return
+    }
+
+    // Limit to 2 decimal places and valid amount
+    const parts = value.split('.')
+    if (parts.length > 1 && parts[1].length > 2) {
+      return
+    }
+
+    // Update amount
+    setBetAmount(value)
+  }
+
+  // Handle amount button clicks
   const handleAmountChange = (amount: string) => {
-    setBetAmount(amount);
-  };
+    // For "Max", we'd normally calculate based on user balance, but for now just set a reasonable max
+    if (amount === "max") {
+      setBetAmount("14.00")
+      return
+    }
+
+    // Otherwise add the amount to the current bet
+    const currentAmount = Number(betAmount) || 0
+    const newAmount = (currentAmount + Number(amount)).toFixed(2)
+    setBetAmount(newAmount)
+  }
 
   // Mock data for chart
   const generateMockChartData = () => {
@@ -632,18 +682,26 @@ export default function ClaimVerifier() {
                       </div>
                     )}
 
-                    {/* Yes/No buttons - standard layout if in Buy tab */}
+                    {/* Yes/No buttons - Now they just highlight selection, not make purchase */}
                     {tradeTab === 'buy' && (
                       <div className="grid grid-cols-2 gap-3 mb-6">
                         <button
-                          className="bg-blue-600 hover:bg-blue-700 rounded-md p-4 flex items-center justify-center font-medium"
-                          onClick={() => handleVote('yes')}
+                          className={`rounded-md p-4 flex items-center justify-center font-medium ${
+                            selectedPosition === 'yes'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-700 hover:bg-gray-600'
+                          }`}
+                          onClick={() => handleSelectPosition('yes')}
                         >
                           Yes {yesPrice}¢
                         </button>
                         <button
-                          className="bg-orange-500 hover:bg-orange-600 rounded-md p-4 flex items-center justify-center font-medium"
-                          onClick={() => handleVote('no')}
+                          className={`rounded-md p-4 flex items-center justify-center font-medium ${
+                            selectedPosition === 'no'
+                              ? 'bg-slate-600 text-white'
+                              : 'bg-gray-700 hover:bg-gray-600'
+                          }`}
+                          onClick={() => handleSelectPosition('no')}
                         >
                           No {noPrice}¢
                         </button>
@@ -668,11 +726,20 @@ export default function ClaimVerifier() {
                       </div>
                     )}
 
-                    {/* Amount */}
+                    {/* Amount - updated to allow direct input */}
                     <div className="mb-4">
                       <div className="flex justify-between mb-2">
                         <span className="text-gray-400">Amount</span>
-                        <span className="text-4xl">${betAmount}</span>
+                        <div className="relative">
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-medium text-gray-500 pl-2">$</span>
+                          <input
+                            type="text"
+                            value={betAmount}
+                            onChange={handleAmountInputChange}
+                            className="bg-transparent text-right text-4xl w-32 focus:outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
                       </div>
                       <div className="text-sm text-gray-400 mb-4">Balance $14.00</div>
 
@@ -698,34 +765,44 @@ export default function ClaimVerifier() {
                         </button>
                         <button
                           className="bg-gray-800 hover:bg-gray-700 rounded-md py-2 text-sm"
-                          onClick={() => handleAmountChange("500")}
+                          onClick={() => handleAmountChange("max")}
                         >
                           Max
                         </button>
                       </div>
                     </div>
 
-                    {/* To win */}
-                    {tradeTab === 'buy' && (
+                    {/* To win - Only shown when a position is selected */}
+                    {tradeTab === 'buy' && selectedPosition && (
                       <div className="flex justify-between items-center mb-6">
                         <div>
                           <div className="flex items-center">
                             <span className="text-lg">To win</span>
                             <span className="text-green-400 ml-1">💰</span>
                           </div>
-                          <div className="text-sm text-gray-500">Avg. Price {yesPrice}¢</div>
+                          <div className="text-sm text-gray-500">
+                            Avg. Price {selectedPosition === 'yes' ? yesPrice : noPrice}¢
+                          </div>
                         </div>
                         <div className="text-green-400 text-4xl font-medium">${potentialWin}</div>
                       </div>
                     )}
 
-                    {/* CTA Button */}
+                    {/* Buy Button - Now shows the selected position */}
                     {tradeTab === 'buy' ? (
                       <button
-                        className="w-full bg-blue-500 hover:bg-blue-600 py-4 rounded-md font-medium"
-                        onClick={() => handleVote('no')}
+                        className={`w-full py-4 rounded-md font-medium ${
+                          selectedPosition
+                            ? 'bg-blue-500 hover:bg-blue-600'
+                            : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        }`}
+                        onClick={handleBuyPosition}
+                        disabled={!selectedPosition}
                       >
-                        Buy No
+                        {selectedPosition
+                          ? `Buy ${selectedPosition === 'yes' ? 'Yes' : 'No'}`
+                          : 'Select a position'
+                        }
                       </button>
                     ) : (
                       <button
