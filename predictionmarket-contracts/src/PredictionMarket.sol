@@ -21,6 +21,8 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         uint256 indexed marketId,
         address indexed market,
         string question,
+        string details,
+        string imageUrl,
         uint256 endTime
     );
     event MarketResolved(uint256 indexed marketId, bool result);
@@ -33,16 +35,23 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
 
     function createMarket(
         string memory question,
+        string memory details,
         uint256 endTime,
-        string memory resolverUrl,
+        string memory imageUrl,
         address resolverAddress
     ) external payable nonReentrant returns (uint256) {
         require(msg.value >= creationFee, "Insufficient creation fee");
         require(endTime > block.timestamp, "End time must be in the future");
+        require(bytes(question).length > 0, "Question cannot be empty");
+
+        // Create resolver URL from question for backward compatibility
+        string memory resolverUrl = "https://api.example.com/eth-price";
 
         Market newMarket = new Market(
             question,
+            details,
             endTime,
+            imageUrl,
             resolverUrl,
             resolverAddress,
             address(this)
@@ -51,7 +60,14 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         uint256 marketId = nextMarketId++;
         markets[marketId] = address(newMarket);
 
-        emit MarketCreated(marketId, address(newMarket), question, endTime);
+        emit MarketCreated(
+            marketId,
+            address(newMarket),
+            question,
+            details,
+            imageUrl,
+            endTime
+        );
 
         return marketId;
     }
