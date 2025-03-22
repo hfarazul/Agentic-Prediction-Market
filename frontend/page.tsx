@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, CheckCircle, XCircle, CircleHelp, Clock, ChevronDown, LineChart } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Loader2, CheckCircle, XCircle, CircleHelp, Clock, ChevronDown, Upload, X, ImageIcon, Calendar } from "lucide-react"
 import TruthOrb from "./truth-orb"
 import axios from "axios"
 import LogDisplay from './components/LogDisplay'
@@ -35,9 +36,36 @@ const circle = {
   too_early: <Clock className="h-12 w-12 text-blue-500" />,
 }
 
+// Helper to format date for display
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  };
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Get default expiry date (30 days from now)
+const getDefaultExpiryDate = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+};
+
 export default function ClaimVerifier() {
   const [claimInput, setClaimInput] = useState("")
+  const [claimDetails, setClaimDetails] = useState("")
+  const [claimImage, setClaimImage] = useState<string | null>(null)
+  const [expiryDate, setExpiryDate] = useState(getDefaultExpiryDate())
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [claim, setClaim] = useState("")
+  const [details, setDetails] = useState("")
+  const [image, setImage] = useState<string | null>(null)
+  const [expiry, setExpiry] = useState("")
+
   const [showDashboard, setShowDashboard] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [result, setResult] = useState<null | {
@@ -63,10 +91,31 @@ export default function ClaimVerifier() {
     setTotalVotes(yesVotes + noVotes)
   }, [yesVotes, noVotes])
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setClaimImage(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveImage = () => {
+    setClaimImage(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
   const handleCreateMarket = () => {
     if (!claimInput.trim()) return
 
     setClaim(claimInput.trim())
+    setDetails(claimDetails)
+    setImage(claimImage)
+    setExpiry(expiryDate)
     setShowDashboard(true)
   }
 
@@ -217,10 +266,11 @@ export default function ClaimVerifier() {
           {!showDashboard && (
             <div className="bg-gray-900 rounded-lg p-6 shadow-xl mb-8">
               <h2 className="text-xl font-bold mb-4">Create a New Market</h2>
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Claim Title */}
                 <div>
                   <label htmlFor="claim" className="block text-sm font-medium text-gray-400 mb-2">
-                    Enter a verifiable claim
+                    Claim Title
                   </label>
                   <Input
                     id="claim"
@@ -228,13 +278,85 @@ export default function ClaimVerifier() {
                     onChange={(e) => setClaimInput(e.target.value)}
                     placeholder="e.g., 'The Earth is flat'"
                     className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:ring-cyan-500 focus:border-cyan-500"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && claimInput.trim()) {
-                        handleCreateMarket();
-                      }
-                    }}
                   />
                 </div>
+
+                {/* Claim Details */}
+                <div>
+                  <label htmlFor="details" className="block text-sm font-medium text-gray-400 mb-2">
+                    Claim Details
+                  </label>
+                  <Textarea
+                    id="details"
+                    value={claimDetails}
+                    onChange={(e) => setClaimDetails(e.target.value)}
+                    placeholder="Provide additional context or details about this claim..."
+                    className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:ring-cyan-500 focus:border-cyan-500 min-h-[100px]"
+                  />
+                </div>
+
+                {/* Expiry Date */}
+                <div>
+                  <label htmlFor="expiry" className="block text-sm font-medium text-gray-400 mb-2">
+                    Resolution Date
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Calendar className="h-5 w-5 text-gray-500" />
+                    </div>
+                    <Input
+                      id="expiry"
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="bg-gray-800 border-gray-700 text-white pl-10 focus:ring-cyan-500 focus:border-cyan-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    The date when this market will be resolved and winners paid out
+                  </p>
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Add Image (Optional)
+                  </label>
+
+                  {claimImage ? (
+                    <div className="relative">
+                      <img
+                        src={claimImage}
+                        alt="Claim Preview"
+                        className="mt-2 rounded-md w-full max-h-[300px] object-contain border border-gray-700"
+                      />
+                      <button
+                        className="absolute top-2 right-2 bg-gray-800 rounded-full p-1 hover:bg-gray-700"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className="border-2 border-dashed border-gray-600 rounded-md p-6 text-center cursor-pointer hover:border-gray-500 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImageIcon className="h-10 w-10 mx-auto text-gray-500 mb-2" />
+                      <p className="text-sm text-gray-400">Click to upload an image</p>
+                      <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</p>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                </div>
+
                 <Button
                   onClick={handleCreateMarket}
                   disabled={!claimInput.trim()}
@@ -251,30 +373,55 @@ export default function ClaimVerifier() {
             <div className="space-y-8">
               {/* Market Header */}
               <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
-                <div className="flex items-start mb-4">
-                  {result ? (
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center mr-4">
-                      {circle[result.decision]}
-                    </div>
-                  ) : (
-                    <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mr-4">
-                      <CircleHelp className="h-8 w-8 text-gray-600" />
+                <div className="flex flex-col md:flex-row gap-6">
+                  {/* Left column with image */}
+                  {image && (
+                    <div className="md:w-1/3">
+                      <img
+                        src={image}
+                        alt="Claim illustration"
+                        className="rounded-lg w-full h-auto object-cover border border-gray-700"
+                      />
                     </div>
                   )}
-                  <h2 className="text-2xl font-bold">{claim}</h2>
-                </div>
 
-                <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
-                  <div>Volume: ${(totalVotes * 10).toLocaleString()}</div>
-                  <div>Expires: Mar 31, 2025</div>
-                </div>
+                  {/* Right column with claim info */}
+                  <div className={image ? "md:w-2/3" : "w-full"}>
+                    <div className="flex items-start mb-4">
+                      {result ? (
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                          {circle[result.decision]}
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                          <CircleHelp className="h-8 w-8 text-gray-600" />
+                        </div>
+                      )}
+                      <h2 className="text-2xl font-bold">{claim}</h2>
+                    </div>
 
-                <div className="flex items-center mb-6">
-                  <div className="mr-2 text-lg font-bold">
-                    <span className="text-blue-400">{yesProbability}% chance</span>
-                  </div>
-                  <div className={`text-sm ${totalVotes === 0 ? 'text-gray-500' : yesProbability > 50 ? 'text-green-500' : 'text-red-500'}`}>
-                    {totalVotes === 0 ? '0%' : yesProbability > 50 ? `↑${yesProbability - 50}%` : `↓${50 - yesProbability}%`}
+                    {details && (
+                      <div className="mb-4 bg-gray-800 p-4 rounded-md border border-gray-700">
+                        <p className="text-gray-300 whitespace-pre-line">{details}</p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
+                      <div>Volume: ${(totalVotes * 10).toLocaleString()}</div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-1" />
+                        Expires: {expiry ? formatDate(expiry) : "Mar 31, 2025"}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center mb-6">
+                      <div className="mr-2 text-lg font-bold">
+                        <span className="text-blue-400">{yesProbability}% chance</span>
+                      </div>
+                      <div className={`text-sm ${totalVotes === 0 ? 'text-gray-500' : yesProbability > 50 ? 'text-green-500' : 'text-red-500'}`}>
+                        {totalVotes === 0 ? '0%' : yesProbability > 50 ? `↑${yesProbability - 50}%` : `↓${50 - yesProbability}%`}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
