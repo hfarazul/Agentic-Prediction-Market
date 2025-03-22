@@ -1,0 +1,17 @@
+services:
+    truthseeker:
+        image: grizzlar99/truthseeker:latest
+        volumes:
+            - /var/run/tappd.sock:/var/run/tappd.sock
+        environment:
+            - ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+            - TAVILY_API_KEY=$TAVILY_API_KEY
+            - EXA_API_KEY=$EXA_API_KEY
+            - PERPLEXITY_API_KEY=$PERPLEXITY_API_KEY
+            - TRUTHSEEKER_OPERATOR_PRIVATE_KEY=$TRUTHSEEKER_OPERATOR_PRIVATE_KEY
+            - TRUTHSEEKER_WS_RPC_URL=$TRUTHSEEKER_WS_RPC_URL
+            - TRUTHSEEKER_TASK_CONTRACT_ADDRESS=$TRUTHSEEKER_TASK_CONTRACT_ADDRESS
+            - TEE_MODE=PRODUCTION
+        ports:
+            - "3000:3000"
+        restart: always
