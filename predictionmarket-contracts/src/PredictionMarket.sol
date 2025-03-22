@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -26,7 +26,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     event MarketResolved(uint256 indexed marketId, bool result);
     event FeesUpdated(uint256 creationFee, uint256 tradingFee);
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         creationFee = 100; // 1%
         tradingFee = 50; // 0.5%
     }
