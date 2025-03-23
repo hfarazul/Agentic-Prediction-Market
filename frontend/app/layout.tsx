@@ -1,20 +1,23 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from "next";
+import { ConnectButton, ThirdwebProvider } from "thirdweb/react";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Truthseeker',
-  description: 'Truthseeker - Claim Verifier',
-  generator: 'v0.dev',
-}
+    title: "Truthseeker",
+    description: "Truthseeker - Claim Verifier",
+    generator: "v0.dev",
+};
 
 export default function RootLayout({
-  children,
+    children,
 }: Readonly<{
-  children: React.ReactNode
+    children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  )
+    return (
+        <html lang="en">
+            <body>
+                <ThirdwebProvider>{children}</ThirdwebProvider>
+            </body>
+        </html>
+    );
 }
