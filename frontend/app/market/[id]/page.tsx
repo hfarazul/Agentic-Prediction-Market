@@ -98,6 +98,8 @@ export default function MarketPage() {
         null
     );
     const [totalWinnings, setTotalWinnings] = useState(0);
+    const [isClaimingWinnings, setIsClaimingWinnings] = useState(false);
+    const [claimTxHash, setClaimTxHash] = useState<string | null>(null);
 
     // Add state for resolution request
     const [isRequestingResolution, setIsRequestingResolution] = useState(false);
@@ -159,12 +161,39 @@ export default function MarketPage() {
                 marketResult,
             ] = marketInfo;
 
+            // Update market resolved status and outcome
+            setIsMarketResolved(isResolved);
+            setResolvedOutcome(
+                isResolved ? (marketResult ? "yes" : "no") : null
+            );
+
+            // If market is resolved and user has positions, calculate winnings
+            if (isResolved && account) {
+                const position = await readContract({
+                    contract: market,
+                    method: "function getPosition(address user) view returns (uint256 yesShares, uint256 noShares)",
+                    params: [account.address],
+                });
+
+                const [yesShares, noShares] = position;
+                const winningShares = marketResult ? yesShares : noShares;
+
+                if (winningShares > 0n) {
+                    // Convert from wei to ETH (divide by 1e18)
+                    const winningsInEth = Number(winningShares) / 1e18;
+                    setTotalWinnings(winningsInEth);
+                } else {
+                    setTotalWinnings(0);
+                }
+            }
+
             // Fetch current ETH price in USD
             const ethPrice = await fetch(
                 "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
             ).then((res) => res.json());
 
-            const ethUsdPrice = ethPrice.ethereum.usd;
+            //if eth price is not available, set to 1200
+            const ethUsdPrice = ethPrice.ethereum.usd || 1200;
 
             // Convert prices from ETH to USD
             const yesPriceUsd = (Number(yesPrice) * ethUsdPrice) / 1e18;
@@ -256,16 +285,21 @@ export default function MarketPage() {
             const ethPrice = await fetch(
                 "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
             ).then((res) => res.json());
-            const amountInEth = amount / ethPrice.ethereum.usd;
 
-            console.log("amountInEth", amountInEth);
+            const ethUsdPrice = ethPrice.ethereum.usd || 1200;
+            const amountInEth = amount / ethUsdPrice;
+
+            // Convert to wei and ensure it's an integer
+            const amountInWei = BigInt(Math.floor(amountInEth * 1e18));
+
+            console.log("amountInWei", amountInWei.toString());
 
             const transaction = await prepareTransaction({
                 chain: sepolia,
                 client,
                 to: market.address,
                 data: tx,
-                value: BigInt(amountInEth * 1e18), // Convert amount to wei
+                value: amountInWei,
             });
 
             const receipt = await sendAndConfirmTransaction({
@@ -418,9 +452,10 @@ export default function MarketPage() {
 
             setLogs((prev) => [
                 ...prev,
-                "[info] Verification result submitted on-chain",
+                `[info] Verification result submitted on-chain. Transaction: https://sepolia.etherscan.io/tx/${resolveReceipt.transactionHash}`,
             ]);
             setTxHash(resolveReceipt.transactionHash);
+            setTxStatus("success");
 
             // Update local state
             resolveMarket(verificationResult.decision);
@@ -527,6 +562,58 @@ export default function MarketPage() {
             month: "short",
             day: "numeric",
         });
+    };
+
+    // Add handleClaimWinnings function
+    const handleClaimWinnings = async () => {
+        if (!account || !marketData || !isMarketResolved) return;
+
+        setIsClaimingWinnings(true);
+        setTxError(null);
+
+        try {
+            const market = getContract({
+                client,
+                chain: sepolia,
+                address: marketData.marketAddress,
+                abi: MarketABI as Abi,
+            });
+
+            const tx = await encodeFunctionData({
+                abi: MarketABI as Abi,
+                functionName: "claimWinnings",
+                args: [],
+            });
+
+            const transaction = await prepareTransaction({
+                chain: sepolia,
+                client,
+                to: market.address,
+                data: tx,
+            });
+
+            const receipt = await sendAndConfirmTransaction({
+                transaction,
+                account,
+            });
+
+            setClaimTxHash(receipt.transactionHash);
+            setLogs((prev) => [
+                ...prev,
+                `[info] Winnings claimed successfully. Transaction: https://sepolia.etherscan.io/tx/${receipt.transactionHash}`,
+            ]);
+
+            // Reset winnings after successful claim
+            setTotalWinnings(0);
+
+            // Refresh market data to update positions
+            await fetchMarketData();
+        } catch (e: any) {
+            console.error("Error claiming winnings:", e);
+            setTxError(e.message);
+        } finally {
+            setIsClaimingWinnings(false);
+        }
     };
 
     if (loading) {
@@ -1061,6 +1148,60 @@ export default function MarketPage() {
                                             Error: {txError}
                                         </div>
                                     )}
+
+                                    {/* Add this inside the user positions section, after the positions list */}
+                                    {isMarketResolved && totalWinnings > 0 && (
+                                        <div className="mt-6 p-4 bg-green-900/20 border border-green-500 rounded-lg">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div>
+                                                    <h3 className="text-lg font-medium text-green-400">
+                                                        Congratulations! 🎉
+                                                    </h3>
+                                                    <p className="text-sm text-green-300">
+                                                        You have{" "}
+                                                        {totalWinnings.toFixed(
+                                                            2
+                                                        )}{" "}
+                                                        ETH in winnings to claim
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    onClick={
+                                                        handleClaimWinnings
+                                                    }
+                                                    disabled={
+                                                        isClaimingWinnings
+                                                    }
+                                                    className="bg-green-500 hover:bg-green-600"
+                                                >
+                                                    {isClaimingWinnings ? (
+                                                        <>
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Claiming...
+                                                        </>
+                                                    ) : (
+                                                        "Claim Winnings"
+                                                    )}
+                                                </Button>
+                                            </div>
+                                            {claimTxHash && (
+                                                <div className="text-sm text-center">
+                                                    <span className="text-green-400">
+                                                        Winnings claimed
+                                                        successfully!{" "}
+                                                    </span>
+                                                    <a
+                                                        href={`https://sepolia.etherscan.io/tx/${claimTxHash}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-400 hover:text-blue-300 underline"
+                                                    >
+                                                        View on Etherscan
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1166,6 +1307,28 @@ export default function MarketPage() {
                                         "Start Verification"
                                     )}
                                 </Button>
+
+                                {txStatus === "success" && txHash && (
+                                    <div className="mt-4 text-sm text-center">
+                                        <span className="text-green-500">
+                                            Verification completed and resolved
+                                            on-chain!{" "}
+                                        </span>
+                                        <a
+                                            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline"
+                                        >
+                                            View on Etherscan
+                                        </a>
+                                    </div>
+                                )}
+                                {txStatus === "error" && txError && (
+                                    <div className="mt-4 text-sm text-red-500 text-center">
+                                        Error: {txError}
+                                    </div>
+                                )}
 
                                 {resolutionRequestTxHash && (
                                     <div className="mt-4 text-sm text-center">
