@@ -36,10 +36,9 @@ import {
     useActiveAccount,
     useSendBatchTransaction,
 } from "thirdweb/react";
-import { sepolia } from "thirdweb/chains";
+import { sepolia, localhost } from "thirdweb/chains";
 import { client } from "@/client";
 import { PredictionMarketABI } from "@/utils/abi/PredictionMarket";
-import { MarketABI } from "@/utils/abi/Market";
 import {
     getContract,
     prepareContractCall,
@@ -47,8 +46,13 @@ import {
     prepareTransaction,
     sendAndConfirmTransaction,
     encode,
+    sendTransaction,
+    readContract,
 } from "thirdweb";
 import { Abi, Account, encodeFunctionData } from "viem";
+import { MarketABI } from "@/utils/abi/Market";
+import { contractAddresses } from "@/utils/contractAddresses";
+import Link from "next/link";
 
 const API_URL = "http://localhost:3000/truthseeker/";
 axios.defaults.baseURL = API_URL;
@@ -120,13 +124,13 @@ export default function ClaimVerifier() {
     const [noVotes, setNoVotes] = useState(0);
     const [betAmount, setBetAmount] = useState("1");
     const [activeTab, setActiveTab] = useState("all");
+    const [txStatus, setTxStatus] = useState<
+        "idle" | "pending" | "success" | "error"
+    >("idle");
+    const [txError, setTxError] = useState<string | null>(null);
     const account = useActiveAccount();
-    const {
-        mutate: sendBatchTransaction,
-        data: batchData,
-        status: txMutationStatus,
-        error: txErrorData,
-    } = useSendBatchTransaction();
+    const { mutate: sendBatchTransaction, data: batchData } =
+        useSendBatchTransaction();
 
     // Add state for user positions
     const [userPositions, setUserPositions] = useState<
@@ -152,6 +156,20 @@ export default function ClaimVerifier() {
 
     // Calculate liquidity parameter based on volume
     const liquidity = calculateLiquidity(marketVolume);
+
+    // Initialize market if needed - with fixed dependencies
+    useEffect(() => {
+        if (showDashboard) {
+            const isMarketEmpty = marketQuantities.every((q) => q === 0);
+            if (isMarketEmpty) {
+                const initialMarket = initializeMarket(
+                    2,
+                    calculateLiquidity(marketVolume)
+                );
+                setMarketQuantities(initialMarket);
+            }
+        }
+    }, [showDashboard]); // Only depend on showDashboard
 
     // Calculate LMSR prices
     const calcLmsrPrices = () => {
@@ -192,19 +210,86 @@ export default function ClaimVerifier() {
 
     const potentialWin = calculatePotentialWin();
 
-    // Compute total votes directly from yes and no votes
+    // Compute totalVotes directly
     const totalVotes = yesVotes + noVotes;
 
-    // Initialize market if needed
-    useEffect(() => {
-        if (showDashboard && marketQuantities.every((q) => q === 0)) {
-            const initialMarket = initializeMarket(
-                2,
-                calculateLiquidity(marketVolume)
-            );
-            setMarketQuantities(initialMarket);
+    // Add state for transaction hash
+    const [txHash, setTxHash] = useState<string | null>(null);
+
+    // Add price fetching function
+    const fetchSharePrices = async () => {
+        try {
+            const market = getContract({
+                client,
+                chain: sepolia,
+                address: "0x0a2B804Bc4d98173119eEEd7cCcF2B4a70d23A68", // Your Market contract address
+                abi: MarketABI as Abi,
+            });
+
+            // Get market info from contract
+            const marketInfo = await readContract({
+                contract: market,
+                method: "function getMarketInfo() view returns (uint256 _yesPool, uint256 _noPool, uint256 yesPrice, uint256 noPrice)",
+            });
+
+            const [yesPool, noPool, yesPrice, noPrice] = marketInfo;
+
+            // Fetch current ETH price in USD
+            const ethPrice = await fetch(
+                "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+            ).then((res) => res.json());
+
+            const ethUsdPrice = ethPrice.ethereum.usd;
+
+            // Convert prices from ETH to USD
+            const yesPriceUsd = (Number(yesPrice) * ethUsdPrice) / 1e18;
+            const noPriceUsd = (Number(noPrice) * ethUsdPrice) / 1e18;
+
+            return {
+                yesPriceUsd,
+                noPriceUsd,
+                yesPool: Number(yesPool) / 1e18,
+                noPool: Number(noPool) / 1e18,
+            };
+        } catch (error) {
+            console.error("Error fetching share prices:", error);
+            return {
+                yesPriceUsd: 0,
+                noPriceUsd: 0,
+                yesPool: 0,
+                noPool: 0,
+            };
         }
-    }, [showDashboard]); // Only run when showDashboard changes
+    };
+
+    // Add state for prices
+    const [sharePrices, setSharePrices] = useState({
+        yesPriceUsd: 0,
+        noPriceUsd: 0,
+    });
+
+    // Add useEffect to fetch prices periodically
+    useEffect(() => {
+        if (showDashboard) {
+            const fetchPrices = async () => {
+                const prices = await fetchSharePrices();
+                setSharePrices({
+                    yesPriceUsd: prices.yesPriceUsd,
+                    noPriceUsd: prices.noPriceUsd,
+                });
+                setMarketQuantities([prices.yesPool, prices.noPool]);
+            };
+
+            // Fetch immediately
+            fetchPrices();
+
+            // Set up interval to fetch prices every 30 seconds
+            const interval = setInterval(fetchPrices, 30000);
+
+            // Cleanup interval on unmount
+            return () => clearInterval(interval);
+        }
+    }, [showDashboard]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -224,108 +309,73 @@ export default function ClaimVerifier() {
         }
     };
 
-    const [txStatus, setTxStatus] = useState<
-        "idle" | "pending" | "success" | "error"
-    >("idle");
-    const [txError, setTxError] = useState<string | null>(null);
+    const handleCreateMarket = async () => {
+        if (!claimInput.trim()) return;
+        setTxStatus("pending");
+        setTxError(null);
+        setTxHash(null);
 
-    // Add effect to track transaction status
-    useEffect(() => {
-        if (txMutationStatus === "pending") {
-            setTxStatus("pending");
-            setTxError(null);
-        } else if (txMutationStatus === "error") {
-            setTxStatus("error");
-            setTxError(txErrorData?.message || "Transaction failed");
-        } else if (txMutationStatus === "success" && batchData) {
-            setTxStatus("success");
-            setTxError(null);
-            // Only update UI after successful transaction
+        try {
+            const predictionMarket = getContract({
+                client,
+                chain: sepolia,
+                address: contractAddresses.PREDICTIONMARKET_CONTRACT_ADDRESS,
+                abi: PredictionMarketABI as Abi,
+            });
+
+            const expiryDateNumber = new Date(expiryDate).getTime() / 1000;
+
+            const tx = await encodeFunctionData({
+                abi: PredictionMarketABI as Abi,
+                functionName: "createMarket",
+                args: [
+                    account?.address,
+                    claimInput.trim(),
+                    claimDetails,
+                    expiryDateNumber,
+                    "claimImage",
+                    "https://example.com/eth.png", //autonome URL
+                    contractAddresses.RESOLVER_CONTRACT_ADDRESS,
+                ],
+            });
+
+            if (!account) {
+                throw new Error("No account connected");
+            }
+
+            const transaction = await prepareTransaction({
+                chain: sepolia,
+                client,
+                to: predictionMarket.address,
+                data: tx,
+                value: BigInt(100000000000000000),
+            });
+
+            const receipt = await sendAndConfirmTransaction({
+                transaction,
+                account,
+            });
+
+            // Set the transaction hash
+            setTxHash(receipt.transactionHash);
+
+            // Open Etherscan in new tab
+            window.open(
+                `https://sepolia.etherscan.io/tx/${receipt.transactionHash}#eventlog`,
+                "_blank"
+            );
+
+            // Update UI state
             setClaim(claimInput.trim());
             setDetails(claimDetails);
             setImage(claimImage);
             setExpiry(expiryDate);
             setShowDashboard(true);
-        }
-    }, [
-        batchData,
-        txMutationStatus,
-        txErrorData,
-        claimInput,
-        claimDetails,
-        claimImage,
-        expiryDate,
-    ]);
-
-    const handleCreateMarket = async () => {
-        if (!claimInput.trim()) return;
-        setTxStatus("pending");
-        setTxError(null);
-
-        const predictionMarket = getContract({
-            client,
-            chain: sepolia,
-            address: "0x72338E08bD9FF71E2c78fc1B0519A704353fFba4",
-            abi: PredictionMarketABI as Abi,
-        });
-
-        const market = getContract({
-            client,
-            chain: sepolia,
-            address: "0x5d3eB25562fC8E87668721e1A2e1515F70837D35",
-            abi: MarketABI as Abi,
-        });
-
-        const expiryDateNumber = new Date(expiryDate).getTime() / 1000;
-
-        try {
-            const createMarketData = await encodeFunctionData({
-                abi: PredictionMarketABI as Abi,
-                functionName: "createMarket",
-                args: [
-                    claimInput.trim(),
-                    claimDetails,
-                    expiryDateNumber,
-                    claimImage,
-                    "0x0E120D6323Fc67Ef0f86ADDfDd152d081E4788C5",
-                ],
-            });
-
-            const initializeMarketData = await encodeFunctionData({
-                abi: MarketABI as Abi,
-                functionName: "initializeMarket",
-            });
-
-            //get the nextMarketId
-            const nextMarketId = await predictionMarket.read.nextMarketId();
-            console.log(nextMarketId);
-
-            const transactions = [
-                prepareTransaction({
-                    to: predictionMarket.address,
-                    chain: sepolia,
-                    client: client,
-                    value: BigInt(0),
-                    data: createMarketData,
-                }),
-                prepareTransaction({
-                    to: market.address,
-                    chain: sepolia,
-                    client: client,
-                    value: BigInt(10000000000000000),
-                    data: initializeMarketData,
-                }),
-            ];
-
-            console.log(transactions);
-            const tx = await sendBatchTransaction(
-                transactions as PreparedTransaction[]
-            );
-            console.log(tx);
+            setTxStatus("success");
         } catch (error: any) {
+            console.error("Error creating market:", error);
             setTxStatus("error");
             setTxError(error.message);
-            console.error("Transaction error:", error);
         }
     };
 
@@ -460,55 +510,109 @@ export default function ClaimVerifier() {
         setSelectedPosition(position);
     };
 
-    // Update the handleBuyPosition function to use LMSR
-    const handleBuyPosition = () => {
-        if (!selectedPosition) return;
+    // Update the handleBuyPosition function to use contract
+    const handleBuyPosition = async () => {
+        if (!selectedPosition || !account) return;
+        setTxStatus("pending");
+        setTxError(null);
+        setTxHash(null);
 
-        // Determine outcome index (0 for yes, 1 for no)
-        const outcomeIndex = selectedPosition === "yes" ? 0 : 1;
+        try {
+            const market = getContract({
+                client,
+                chain: sepolia,
+                address: "0x0a2B804Bc4d98173119eEEd7cCcF2B4a70d23A68", // Your Market contract address
+                abi: MarketABI as Abi,
+            });
 
-        // Amount to spend
-        const amount = Number(betAmount);
-        if (amount <= 0) return;
+            // Amount to spend
+            const amount = Number(betAmount);
+            if (amount <= 0) return;
 
-        // Calculate shares to buy with this amount
-        const shares = calculateSharesToBuy(
-            outcomeIndex,
-            amount,
-            marketQuantities,
-            liquidity
-        );
+            const tx = await encodeFunctionData({
+                abi: MarketABI as Abi,
+                functionName: "buyShares",
+                args: [selectedPosition === "yes"],
+            });
 
-        // Calculate actual cost (might be slightly less than amount due to rounding)
-        const actualCost = calculateCostToBuy(
-            outcomeIndex,
-            shares,
-            marketQuantities,
-            liquidity
-        );
+            //convert USD to ETH using the price of ETH fetched from CoinGecko
+            const ethPrice = await fetch(
+                "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+            ).then((res) => res.json());
+            const amountInEth = amount / ethPrice.ethereum.usd;
 
-        // Update market quantities
-        const newQuantities = [...marketQuantities];
-        newQuantities[outcomeIndex] += shares;
-        setMarketQuantities(newQuantities);
+            console.log("amountInEth", amountInEth);
 
-        // Update market volume
-        setMarketVolume((prev) => prev + actualCost);
+            const transaction = await prepareTransaction({
+                chain: sepolia,
+                client,
+                to: market.address,
+                data: tx,
+                value: BigInt(amountInEth * 1e18), // Convert amount to wei
+            });
 
-        // Add to positions
-        setUserPositions((prev) => [
-            ...prev,
-            {
-                type: selectedPosition,
-                amount: actualCost,
-                price: Number(selectedPosition === "yes" ? yesPrice : noPrice),
-                quantity: shares,
-            },
-        ]);
+            const receipt = await sendAndConfirmTransaction({
+                transaction,
+                account,
+            });
 
-        // Reset bet amount and selected position
-        setBetAmount("1");
-        setSelectedPosition(null);
+            // Set the transaction hash
+            setTxHash(receipt.transactionHash);
+
+            // Open Etherscan in new tab
+            window.open(
+                `https://sepolia.etherscan.io/tx/${receipt.transactionHash}#eventlog`,
+                "_blank"
+            );
+
+            // Update UI state
+            setTxStatus("success");
+
+            // Reset bet amount and selected position
+            setBetAmount("1");
+            setSelectedPosition(null);
+
+            // Update market quantities from contract
+            const marketInfo = await readContract({
+                contract: market,
+                method: "function getMarketInfo() view returns (uint256 _yesPool, uint256 _noPool, uint256 yesPrice, uint256 noPrice)",
+            });
+
+            const [yesPool, noPool, yesPrice, noPrice] = marketInfo;
+
+            setMarketQuantities([
+                Number(yesPool) / 1e18,
+                Number(noPool) / 1e18,
+            ]);
+
+            // Update user positions
+            const position = await readContract({
+                contract: market,
+                method: "function getPosition(address user) view returns (uint256 yesShares, uint256 noShares)",
+                params: [account.address],
+            });
+
+            const [yesShares, noShares] = position;
+
+            setUserPositions([
+                {
+                    type: "yes",
+                    amount: Number(yesShares) / 1e18,
+                    price: Number(yesPrice) / 1e18,
+                    quantity: Number(yesShares) / 1e18,
+                },
+                {
+                    type: "no",
+                    amount: Number(noShares) / 1e18,
+                    price: Number(noPrice) / 1e18,
+                    quantity: Number(noShares) / 1e18,
+                },
+            ]);
+        } catch (error: any) {
+            console.error("Error buying shares:", error);
+            setTxStatus("error");
+            setTxError(error.message);
+        }
     };
 
     // Format currency
@@ -544,11 +648,19 @@ export default function ClaimVerifier() {
             {/* Header with navigation */}
             <header className="border-b border-gray-800 p-4">
                 <div className="container mx-auto flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                        <TruthOrb className="h-8 w-8" />
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
-                            Prediction Market
-                        </h1>
+                    <div className="flex items-center space-x-6">
+                        <Link href="/" className="flex items-center space-x-2">
+                            <TruthOrb className="h-8 w-8" />
+                            <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
+                                Prediction Market
+                            </h1>
+                        </Link>
+                        <Link
+                            href="/markets"
+                            className="text-gray-300 hover:text-white transition-colors"
+                        >
+                            Browse Markets
+                        </Link>
                     </div>
 
                     {showDashboard && (
@@ -753,27 +865,39 @@ export default function ClaimVerifier() {
                                         !claimInput.trim() ||
                                         txStatus === "pending"
                                     }
-                                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
+                                    className={`w-full ${
+                                        txStatus === "pending"
+                                            ? "bg-gray-600 cursor-not-allowed"
+                                            : "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
+                                    }`}
                                 >
                                     {txStatus === "pending" ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <div className="flex items-center justify-center">
+                                            <Loader2 className="animate-spin h-5 w-5 mr-2" />
                                             Creating Market...
-                                        </>
-                                    ) : txStatus === "error" ? (
-                                        "Failed to Create Market"
+                                        </div>
                                     ) : (
                                         "Create Market"
                                     )}
                                 </Button>
-                                {txStatus === "error" && txError && (
-                                    <div className="mt-2 text-sm text-red-500">
-                                        Error: {txError}
+                                {txStatus === "success" && txHash && (
+                                    <div className="mt-2 text-sm text-center">
+                                        <span className="text-green-500">
+                                            Market created successfully!{" "}
+                                        </span>
+                                        <a
+                                            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline"
+                                        >
+                                            View on Etherscan
+                                        </a>
                                     </div>
                                 )}
-                                {txStatus === "success" && (
-                                    <div className="mt-2 text-sm text-green-500">
-                                        Market created successfully!
+                                {txStatus === "error" && txError && (
+                                    <div className="mt-2 text-sm text-red-500 text-center">
+                                        Error: {txError}
                                     </div>
                                 )}
                             </div>
@@ -1168,7 +1292,10 @@ export default function ClaimVerifier() {
                                                                 )
                                                             }
                                                         >
-                                                            Yes {yesPrice}¢
+                                                            Yes $
+                                                            {sharePrices.yesPriceUsd.toFixed(
+                                                                2
+                                                            )}
                                                         </button>
                                                         <button
                                                             className={`rounded-md p-4 flex items-center justify-center font-medium ${
@@ -1183,7 +1310,10 @@ export default function ClaimVerifier() {
                                                                 )
                                                             }
                                                         >
-                                                            No {noPrice}¢
+                                                            No $
+                                                            {sharePrices.noPriceUsd.toFixed(
+                                                                2
+                                                            )}
                                                         </button>
                                                     </div>
                                                 )}
