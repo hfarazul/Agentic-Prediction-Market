@@ -239,7 +239,7 @@ export default function ClaimVerifier() {
                 "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
             ).then((res) => res.json());
 
-            const ethUsdPrice = ethPrice.ethereum.usd;
+            const ethUsdPrice = ethPrice.ethereum.usd || 1200;
 
             // Convert prices from ETH to USD
             const yesPriceUsd = (Number(yesPrice) * ethUsdPrice) / 1e18;
