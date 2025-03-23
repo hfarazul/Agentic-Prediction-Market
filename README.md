@@ -56,15 +56,13 @@ Prophet AI provides a more nuanced and appropriate response, concluding it is **
 
 Another troubling example is the Polymarket question "Is Earth flat?" with over $76,000 in trading volume, showing a 3% chance of "YES" despite overwhelming scientific consensus.
 
-![Earth is flat market on Polymarket](figures/FlatEarth.png)
+![Earth is flat market on Polymarket](figures/Polymarket3.png)
 
 Some users are clearly trolling or manipulating the market:
 
-![Comment on flat Earth market](figures/FlatEarthComment.png)
+![Comment on flat Earth market](figures/Comment3.png)
 
 This case demonstrates how even settled scientific questions can be distorted in prediction markets when resolvers like UMA are susceptible to manipulation. Prophet AI agents provide definitive, evidence-based resolutions that eliminate such manipulation potential:
-
-<img src="figures/ClaimFlatEarth.png" alt="False claim" style="width:60%; max-width:800px; height:auto;" />
 
 ## Our Solution
 
