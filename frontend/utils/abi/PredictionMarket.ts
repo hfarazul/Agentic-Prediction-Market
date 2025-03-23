@@ -7,13 +7,6 @@ export const PredictionMarketABI = [
     { type: "receive", stateMutability: "payable" },
     {
         type: "function",
-        name: "FEE_DENOMINATOR",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-        stateMutability: "view",
-    },
-    {
-        type: "function",
         name: "createMarket",
         inputs: [
             {
@@ -37,6 +30,11 @@ export const PredictionMarketABI = [
                 internalType: "string",
             },
             {
+                name: "resolverUrl",
+                type: "string",
+                internalType: "string",
+            },
+            {
                 name: "resolverAddress",
                 type: "address",
                 internalType: "address",
@@ -44,13 +42,6 @@ export const PredictionMarketABI = [
         ],
         outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
         stateMutability: "payable",
-    },
-    {
-        type: "function",
-        name: "creationFee",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-        stateMutability: "view",
     },
     {
         type: "function",
@@ -95,13 +86,6 @@ export const PredictionMarketABI = [
     },
     {
         type: "function",
-        name: "tradingFee",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-        stateMutability: "view",
-    },
-    {
-        type: "function",
         name: "transferOwnership",
         inputs: [
             {
@@ -115,15 +99,17 @@ export const PredictionMarketABI = [
     },
     {
         type: "function",
-        name: "updateFees",
+        name: "withdrawFees",
+        inputs: [],
+        outputs: [],
+        stateMutability: "nonpayable",
+    },
+    {
+        type: "function",
+        name: "withdrawMarketFees",
         inputs: [
             {
-                name: "_creationFee",
-                type: "uint256",
-                internalType: "uint256",
-            },
-            {
-                name: "_tradingFee",
+                name: "marketId",
                 type: "uint256",
                 internalType: "uint256",
             },
@@ -133,8 +119,14 @@ export const PredictionMarketABI = [
     },
     {
         type: "function",
-        name: "withdrawFees",
-        inputs: [],
+        name: "withdrawMarketFeesBatch",
+        inputs: [
+            {
+                name: "marketIds",
+                type: "uint256[]",
+                internalType: "uint256[]",
+            },
+        ],
         outputs: [],
         stateMutability: "nonpayable",
     },
@@ -193,6 +185,25 @@ export const PredictionMarketABI = [
             },
             {
                 name: "endTime",
+                type: "uint256",
+                indexed: false,
+                internalType: "uint256",
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: "event",
+        name: "MarketFeesWithdrawn",
+        inputs: [
+            {
+                name: "marketId",
+                type: "uint256",
+                indexed: true,
+                internalType: "uint256",
+            },
+            {
+                name: "amount",
                 type: "uint256",
                 indexed: false,
                 internalType: "uint256",
