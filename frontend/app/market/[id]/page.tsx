@@ -9,6 +9,8 @@ import {
     sendAndConfirmTransaction,
 } from "thirdweb";
 import { sepolia } from "thirdweb/chains";
+import { privateKeyToAccount } from "thirdweb/wallets";
+
 import { client } from "@/client";
 import { Abi, encodeFunctionData } from "viem";
 import { PredictionMarketABI } from "@/utils/abi/PredictionMarket";
@@ -64,7 +66,6 @@ export default function MarketPage() {
         expiryDate: Date;
         marketAddress: string;
         resolverAddress: string;
-        creator: string;
     } | null>(null);
 
     // Market state
@@ -176,7 +177,6 @@ export default function MarketPage() {
                 expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days from now
                 marketAddress: marketData as `0x${string}`,
                 resolverAddress,
-                creator,
             });
 
             setMarketQuantities([
@@ -405,9 +405,15 @@ export default function MarketPage() {
                 data: resolveMarketTx,
             });
 
+            const agentWallet = privateKeyToAccount({
+                client,
+                privateKey: process.env
+                    .NEXT_PUBLIC_AGENT_PRIVATE_KEY as `0x${string}`,
+            });
+
             const resolveReceipt = await sendAndConfirmTransaction({
                 transaction: resolveTransaction,
-                account,
+                account: agentWallet,
             });
 
             setLogs((prev) => [
@@ -572,37 +578,30 @@ export default function MarketPage() {
                         </Link>
                     </div>
 
-                    {/* View toggle buttons - Only show admin tab for creator */}
-                    {/* {account && marketData?.creator && ( */}
-                    {account && (
-                        <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-1">
-                            <button
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                    activeView === "user"
-                                        ? "bg-gray-700 text-white"
-                                        : "text-gray-400 hover:text-white"
-                                }`}
-                                onClick={() => setActiveView("user")}
-                            >
-                                <Users className="h-4 w-4 inline mr-1" />
-                                User View
-                            </button>
-                            {account.address.toLowerCase() ===
-                                marketData.creator.toLowerCase() && (
-                                <button
-                                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                        activeView === "admin"
-                                            ? "bg-gray-700 text-white"
-                                            : "text-gray-400 hover:text-white"
-                                    }`}
-                                    onClick={() => setActiveView("admin")}
-                                >
-                                    <ShieldCheck className="h-4 w-4 inline mr-1" />
-                                    Admin View
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-1">
+                        <button
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                activeView === "user"
+                                    ? "bg-gray-700 text-white"
+                                    : "text-gray-400 hover:text-white"
+                            }`}
+                            onClick={() => setActiveView("user")}
+                        >
+                            <Users className="h-4 w-4 inline mr-1" />
+                            User View
+                        </button>
+                        <button
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                activeView === "admin"
+                                    ? "bg-gray-700 text-white"
+                                    : "text-gray-400 hover:text-white"
+                            }`}
+                            onClick={() => setActiveView("admin")}
+                        >
+                            <ShieldCheck className="h-4 w-4 inline mr-1" />
+                            Admin View
+                        </button>
+                    </div>
 
                     <ConnectButton client={client} />
                 </div>
@@ -1129,67 +1128,62 @@ export default function MarketPage() {
                         )}
 
                         {/* Admin View - Verification Panel */}
-                        {activeView === "admin" &&
-                            account &&
-                            marketData?.creator &&
-                            account.address.toLowerCase() ===
-                                marketData.creator.toLowerCase() && (
-                                <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
-                                    <div className="flex items-center mb-3">
-                                        <span className="bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full mr-2">
-                                            Admin Only
-                                        </span>
-                                        <h3 className="text-lg font-medium">
-                                            Market Verification
-                                        </h3>
-                                    </div>
-                                    <p className="text-gray-400 mb-6">
-                                        Use AI verification to analyze this
-                                        claim and determine its factual
-                                        accuracy. Verification results will be
-                                        visible to all market participants.
-                                    </p>
-
-                                    <Button
-                                        onClick={handleVerify}
-                                        disabled={
-                                            isRequestingResolution ||
-                                            isVerifying
-                                        }
-                                        className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
-                                    >
-                                        {isRequestingResolution ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Requesting Resolution...
-                                            </>
-                                        ) : isVerifying ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Verifying Claim...
-                                            </>
-                                        ) : (
-                                            "Start Verification"
-                                        )}
-                                    </Button>
-
-                                    {resolutionRequestTxHash && (
-                                        <div className="mt-4 text-sm text-center">
-                                            <span className="text-green-500">
-                                                Resolution request submitted!{" "}
-                                            </span>
-                                            <a
-                                                href={`https://sepolia.etherscan.io/tx/${resolutionRequestTxHash}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-blue-400 hover:text-blue-300 underline"
-                                            >
-                                                View on Etherscan
-                                            </a>
-                                        </div>
-                                    )}
+                        {activeView === "admin" && (
+                            <div className="bg-gray-900 rounded-lg p-6 shadow-xl">
+                                <div className="flex items-center mb-3">
+                                    <span className="bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full mr-2">
+                                        Admin Only
+                                    </span>
+                                    <h3 className="text-lg font-medium">
+                                        Market Verification
+                                    </h3>
                                 </div>
-                            )}
+                                <p className="text-gray-400 mb-6">
+                                    Use AI verification to analyze this claim
+                                    and determine its factual accuracy.
+                                    Verification results will be visible to all
+                                    market participants.
+                                </p>
+
+                                <Button
+                                    onClick={handleVerify}
+                                    disabled={
+                                        isRequestingResolution || isVerifying
+                                    }
+                                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                                >
+                                    {isRequestingResolution ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Requesting Resolution...
+                                        </>
+                                    ) : isVerifying ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Verifying Claim...
+                                        </>
+                                    ) : (
+                                        "Start Verification"
+                                    )}
+                                </Button>
+
+                                {resolutionRequestTxHash && (
+                                    <div className="mt-4 text-sm text-center">
+                                        <span className="text-green-500">
+                                            Resolution request submitted!{" "}
+                                        </span>
+                                        <a
+                                            href={`https://sepolia.etherscan.io/tx/${resolutionRequestTxHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline"
+                                        >
+                                            View on Etherscan
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -465,7 +465,6 @@ contract Market is ReentrancyGuard {
 
     function resolve(bool _result) external {
         require(msg.sender == resolverAddress, "Only resolver can resolve");
-        require(block.timestamp >= endTime, "Market not ended");
         require(!resolved, "Already resolved");
 
         resolved = true;
