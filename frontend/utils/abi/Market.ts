@@ -189,6 +189,36 @@ export const MarketABI = [
         inputs: [],
         outputs: [
             {
+                name: "_creator",
+                type: "address",
+                internalType: "address",
+            },
+            {
+                name: "_question",
+                type: "string",
+                internalType: "string",
+            },
+            {
+                name: "_details",
+                type: "string",
+                internalType: "string",
+            },
+            {
+                name: "_imageUrl",
+                type: "string",
+                internalType: "string",
+            },
+            {
+                name: "_resolverUrl",
+                type: "string",
+                internalType: "string",
+            },
+            {
+                name: "_resolverAddress",
+                type: "address",
+                internalType: "address",
+            },
+            {
                 name: "_totalYesShares",
                 type: "uint256",
                 internalType: "uint256",

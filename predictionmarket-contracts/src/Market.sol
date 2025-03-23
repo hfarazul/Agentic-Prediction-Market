@@ -400,6 +400,12 @@ contract Market is ReentrancyGuard {
         external
         view
         returns (
+            address _creator,
+            string memory _question,
+            string memory _details,
+            string memory _imageUrl,
+            string memory _resolverUrl,
+            address _resolverAddress,
             uint256 _totalYesShares,
             uint256 _totalNoShares,
             uint256 _yesPool,
@@ -411,6 +417,12 @@ contract Market is ReentrancyGuard {
         )
     {
         return (
+            creator,
+            question,
+            details,
+            imageUrl,
+            resolverUrl,
+            resolverAddress,
             totalYesShares,
             totalNoShares,
             yesPool,
