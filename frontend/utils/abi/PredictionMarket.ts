@@ -10,6 +10,11 @@ export const PredictionMarketABI = [
         name: "createMarket",
         inputs: [
             {
+                name: "creator",
+                type: "address",
+                internalType: "address",
+            },
+            {
                 name: "question",
                 type: "string",
                 internalType: "string",
