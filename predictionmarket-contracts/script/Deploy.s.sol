@@ -42,6 +42,7 @@ contract DeployPredictionMarket is Script {
             uint256 endTime = block.timestamp + 365 days; // 1 year from now
             string memory imageUrl = "https://example.com/eth.png";
             address resolverAddress = address(resolver);
+            string memory resolverUrl = "https://api.example.com/eth-price";
 
             // Create market with initial fee
             uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
@@ -49,16 +50,11 @@ contract DeployPredictionMarket is Script {
                 details,
                 endTime,
                 imageUrl,
+                resolverUrl,
                 resolverAddress
             );
             address marketAddress = predictionMarket.getMarket(marketId);
             console2.log("Test market created at:", marketAddress);
-
-            // Initialize market with liquidity
-            Market(payable(marketAddress)).initializeMarket{
-                value: INITIAL_LIQUIDITY
-            }();
-            console2.log("Test market initialized with:", INITIAL_LIQUIDITY);
         }
 
         vm.stopBroadcast();
