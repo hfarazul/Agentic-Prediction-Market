@@ -3,6 +3,11 @@ export const MarketABI = [
         type: "constructor",
         inputs: [
             {
+                name: "_creator",
+                type: "address",
+                internalType: "address",
+            },
+            {
                 name: "_question",
                 type: "string",
                 internalType: "string",
@@ -38,7 +43,7 @@ export const MarketABI = [
                 internalType: "address",
             },
         ],
-        stateMutability: "nonpayable",
+        stateMutability: "payable",
     },
     { type: "receive", stateMutability: "payable" },
     {
@@ -138,6 +143,13 @@ export const MarketABI = [
         inputs: [],
         outputs: [],
         stateMutability: "nonpayable",
+    },
+    {
+        type: "function",
+        name: "creator",
+        inputs: [],
+        outputs: [{ name: "", type: "address", internalType: "address" }],
+        stateMutability: "view",
     },
     {
         type: "function",
