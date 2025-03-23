@@ -72,30 +72,7 @@ contract Market is ReentrancyGuard {
     event PriceUpdated(uint256 yesPrice, uint256 noPrice);
     event MarketInitialized(uint256 initialLiquidity);
 
-    constructor(
-        string memory _question,
-        string memory _details,
-        uint256 _endTime,
-        string memory _imageUrl,
-        string memory _resolverUrl,
-        address _resolverAddress,
-        address _predictionMarket
-    ) {
-        question = _question;
-        details = _details;
-        endTime = _endTime;
-        imageUrl = _imageUrl;
-        resolverUrl = _resolverUrl;
-        resolverAddress = _resolverAddress;
-        predictionMarket = _predictionMarket;
-
-        // Start with zero liquidity - requires initialization
-        yesPool = 0;
-        noPool = 0;
-        initialized = false;
-    }
-
-    function initializeMarket() external payable nonReentrant {
+    function initializeMarket() public payable nonReentrant {
         require(!initialized, "Market already initialized");
         require(msg.value >= MIN_LIQUIDITY, "Insufficient initial liquidity");
         require(block.timestamp < endTime, "Market ended");
@@ -107,6 +84,26 @@ contract Market is ReentrancyGuard {
 
         emit MarketInitialized(msg.value);
         emit PriceUpdated(_getYesPrice(), _getNoPrice());
+    }
+
+    constructor(
+        string memory _question,
+        string memory _details,
+        uint256 _endTime,
+        string memory _imageUrl,
+        string memory _resolverUrl,
+        address _resolverAddress,
+        address _predictionMarket
+    ) payable {
+        question = _question;
+        details = _details;
+        endTime = _endTime;
+        imageUrl = _imageUrl;
+        resolverUrl = _resolverUrl;
+        resolverAddress = _resolverAddress;
+        predictionMarket = _predictionMarket;
+
+        initializeMarket();
     }
 
     function calculatePriceImpact(
