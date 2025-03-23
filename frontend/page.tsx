@@ -402,7 +402,7 @@ export default function ClaimVerifier() {
           <div className="flex items-center space-x-2">
             <TruthOrb className="h-8 w-8" />
             <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
-              Prediction Market
+              Prophet.ai
             </h1>
           </div>
 
@@ -1004,7 +1004,7 @@ export default function ClaimVerifier() {
 
       <footer className="py-6 border-t border-gray-800">
         <div className="container mx-auto text-center text-gray-500 text-sm">
-          <p>Prediction Market © {new Date().getFullYear()} • Claim Verification System</p>
+          <p>Prophet.ai © {new Date().getFullYear()} • Claim Verification System</p>
         </div>
       </footer>
     </div>

@@ -4,6 +4,7 @@
 - [Overview](#overview)
 - [The Problem](#the-problem)
   - [Case Study: Polymarket Disputed Resolution](#case-study-polymarket-disputed-resolution)
+  - [Case Study: Scientific Consensus Manipulation](#case-study-scientific-consensus-manipulation)
 - [Our Solution](#our-solution)
   - [Key Benefits](#key-benefits)
 - [How Prophet AI Works](#how-prophet-ai-works)
@@ -50,6 +51,20 @@ Users strongly contested this resolution:
 Prophet AI provides a more nuanced and appropriate response, concluding it is **too early** to resolve the market. Not enough substantive evidence has been released to resolve to "Yes," and the 100-day deadline has not been reached yet.
 
 <img src="figures/ClaimPolymarket1.png" alt="Too early claim" style="width:60%; max-width:800px; height:auto;" />
+
+### Case Study: Scientific Consensus Manipulation
+
+Another troubling example is the Polymarket question "Is Earth flat?" with over $76,000 in trading volume, showing a 3% chance of "YES" despite overwhelming scientific consensus.
+
+![Earth is flat market on Polymarket](figures/FlatEarth.png)
+
+Some users are clearly trolling or manipulating the market:
+
+![Comment on flat Earth market](figures/FlatEarthComment.png)
+
+This case demonstrates how even settled scientific questions can be distorted in prediction markets when resolvers like UMA are susceptible to manipulation. Prophet AI agents provide definitive, evidence-based resolutions that eliminate such manipulation potential:
+
+<img src="figures/ClaimFlatEarth.png" alt="False claim" style="width:60%; max-width:800px; height:auto;" />
 
 ## Our Solution
 

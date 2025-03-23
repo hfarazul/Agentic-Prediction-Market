@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Truthseeker',
-  description: 'Truthseeker - Claim Verifier',
+  title: 'Prophet.ai',
+  description: 'Prophet.ai - Predictive Claim Verification Market',
   generator: 'v0.dev',
 }
 
