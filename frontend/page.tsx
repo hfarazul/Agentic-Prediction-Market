@@ -347,13 +347,16 @@ export default function ClaimVerifier() {
     // Update market volume
     setMarketVolume(prev => prev + actualCost);
 
-    // Add to positions
+    // Add to positions with LMSR prices
+    const currentYesPrice = Number(yesPrice);
+    const currentNoPrice = Number(noPrice);
+
     setUserPositions(prev => [
       ...prev,
       {
         type: selectedPosition,
         amount: actualCost,
-        price: Number(selectedPosition === 'yes' ? yesPrice : noPrice),
+        price: selectedPosition === 'yes' ? currentYesPrice : currentNoPrice,
         quantity: shares
       }
     ]);
