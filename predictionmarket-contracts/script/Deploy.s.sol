@@ -46,6 +46,7 @@ contract DeployPredictionMarket is Script {
 
             // Create market with initial fee
             uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
+                deployerAddress,
                 question,
                 details,
                 endTime,

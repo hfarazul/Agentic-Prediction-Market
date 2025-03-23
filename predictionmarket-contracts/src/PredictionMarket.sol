@@ -27,6 +27,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) {}
 
     function createMarket(
+        address creator,
         string memory question,
         string memory details,
         uint256 endTime,
@@ -38,6 +39,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         require(bytes(question).length > 0, "Question cannot be empty");
 
         Market newMarket = new Market{value: msg.value}(
+            creator,
             question,
             details,
             endTime,

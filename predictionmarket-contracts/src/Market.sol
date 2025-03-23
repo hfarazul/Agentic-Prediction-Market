@@ -11,6 +11,7 @@ contract Market is ReentrancyGuard {
         uint256 noShares;
     }
 
+    address public creator;
     string public question;
     string public details;
     string public imageUrl;
@@ -87,6 +88,7 @@ contract Market is ReentrancyGuard {
     }
 
     constructor(
+        address _creator,
         string memory _question,
         string memory _details,
         uint256 _endTime,
@@ -95,6 +97,7 @@ contract Market is ReentrancyGuard {
         address _resolverAddress,
         address _predictionMarket
     ) payable {
+        creator = _creator;
         question = _question;
         details = _details;
         endTime = _endTime;
