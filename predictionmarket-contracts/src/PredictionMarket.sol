@@ -11,11 +11,6 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     mapping(uint256 => address) public markets;
     uint256 public nextMarketId;
 
-    // Fee configuration
-    uint256 public creationFee;
-    uint256 public tradingFee;
-    uint256 public constant FEE_DENOMINATOR = 10000;
-
     // Events
     event MarketCreated(
         uint256 indexed marketId,
@@ -29,26 +24,20 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     event FeesUpdated(uint256 creationFee, uint256 tradingFee);
     event MarketFeesWithdrawn(uint256 indexed marketId, uint256 amount);
 
-    constructor() Ownable(msg.sender) {
-        creationFee = 100; // 1%
-        tradingFee = 50; // 0.5%
-    }
+    constructor() Ownable(msg.sender) {}
 
     function createMarket(
         string memory question,
         string memory details,
         uint256 endTime,
         string memory imageUrl,
+        string memory resolverUrl,
         address resolverAddress
     ) external payable nonReentrant returns (uint256) {
-        require(msg.value >= creationFee, "Insufficient creation fee");
         require(endTime > block.timestamp, "End time must be in the future");
         require(bytes(question).length > 0, "Question cannot be empty");
 
-        // Create resolver URL from question for backward compatibility
-        string memory resolverUrl = "https://api.example.com/eth-price";
-
-        Market newMarket = new Market(
+        Market newMarket = new Market{value: msg.value}(
             question,
             details,
             endTime,
@@ -75,19 +64,6 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
 
     function getMarket(uint256 marketId) external view returns (address) {
         return markets[marketId];
-    }
-
-    function updateFees(
-        uint256 _creationFee,
-        uint256 _tradingFee
-    ) external onlyOwner {
-        require(_creationFee <= 1000, "Creation fee too high"); // Max 10%
-        require(_tradingFee <= 500, "Trading fee too high"); // Max 5%
-
-        creationFee = _creationFee;
-        tradingFee = _tradingFee;
-
-        emit FeesUpdated(_creationFee, _tradingFee);
     }
 
     // Withdraw fees from a specific market
