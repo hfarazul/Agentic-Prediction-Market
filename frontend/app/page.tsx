@@ -53,7 +53,6 @@ import { Abi, Account, encodeFunctionData } from "viem";
 import { MarketABI } from "@/utils/abi/Market";
 import { contractAddresses } from "@/utils/contractAddresses";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const API_URL = "http://localhost:3000/truthseeker/";
 axios.defaults.baseURL = API_URL;
@@ -310,8 +309,6 @@ export default function ClaimVerifier() {
         }
     };
 
-    const router = useRouter();
-
     const handleCreateMarket = async () => {
         if (!claimInput.trim()) return;
         setTxStatus("pending");
@@ -362,33 +359,19 @@ export default function ClaimVerifier() {
             // Set the transaction hash
             setTxHash(receipt.transactionHash);
 
-            // Get the market ID from the event logs
-            const marketCreatedEvent = receipt.logs.find((log) => {
-                // Event signature for MarketCreated(uint256 indexed marketId, address indexed creator)
-                return (
-                    log.topics[0] ===
-                    "0x5b02175c78f2d0dca0e7f58491f818616aab0a7282ad3f41f3457427250f0694"
-                );
-            });
+            // Open Etherscan in new tab
+            window.open(
+                `https://sepolia.etherscan.io/tx/${receipt.transactionHash}#eventlog`,
+                "_blank"
+            );
 
-            if (marketCreatedEvent && marketCreatedEvent.topics[1]) {
-                const marketId = parseInt(
-                    marketCreatedEvent.topics[1] as string,
-                    16
-                );
-
-                // Open Etherscan in new tab
-                window.open(
-                    `https://sepolia.etherscan.io/tx/${receipt.transactionHash}#eventlog`,
-                    "_blank"
-                );
-
-                // Update UI state
-                setTxStatus("success");
-
-                // Redirect to the market page using Next.js router
-                router.push(`/market/${marketId}`);
-            }
+            // Update UI state
+            setClaim(claimInput.trim());
+            setDetails(claimDetails);
+            setImage(claimImage);
+            setExpiry(expiryDate);
+            setShowDashboard(true);
+            setTxStatus("success");
         } catch (error: any) {
             console.error("Error creating market:", error);
             setTxStatus("error");
