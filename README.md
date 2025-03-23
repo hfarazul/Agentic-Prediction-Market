@@ -1,261 +1,197 @@
-# Eliza 🤖
+# Prophet.ai - Agentic Prediction Market
 
-<div align="center">
-  <img src="./docs/static/img/eliza_banner.jpg" alt="Eliza Banner" width="100%" />
-</div>
+## Table of Contents
+- [Overview](#overview)
+- [The Problem](#the-problem)
+  - [Case Study: Polymarket Disputed Resolution](#case-study-polymarket-disputed-resolution)
+  - [Case Study: Scientific Consensus Manipulation](#case-study-scientific-consensus-manipulation)
+- [Our Solution](#our-solution)
+  - [Key Benefits](#key-benefits)
+- [How Prophet AI Works](#how-prophet-ai-works)
+  - [Agentic Verification Mechanism](#agentic-verification-mechanism)
+  - [Blockchain Infrastructure](#blockchain-infrastructure)
+  - [System Participants](#system-participants)
+  - [Verification Workflow](#verification-workflow)
+- [Getting Started](#getting-started)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+  - [Running the Agent](#running-the-agent)
+  - [Running the Prediction Market](#running-the-prediction-market)
+- [Examples & Case Studies](#examples--case-studies)
+  - [Scientific Claims](#scientific-claims)
+  - [Health-Related Claims](#health-related-claims)
+  - [Technology Release Claims](#technology-release-claims)
 
-<div align="center">
+## Overview
 
-📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
+Prophet.ai is a Prediction market that leverages AI agents for claim verification. By combining advanced AI with blockchain infrastructure, Prophet.ai enables unbiased and censorship-resistant claim verification.
 
-</div>
+## The Problem
 
-## 🌍 README Translations
+Popular **prediction markets** use optimistic oracles like UMA which have several significant challenges:
 
-[中文说明](i18n/readme/README_CN.md) | [日本語の説明](i18n/readme/README_JA.md) | [한국어 설명](i18n/readme/README_KOR.md) | [Persian](i18n/readme/README_FA.md) | [Français](i18n/readme/README_FR.md) | [Português](i18n/readme/README_PTBR.md) | [Türkçe](i18n/readme/README_TR.md) | [Русский](i18n/readme/README_RU.md) | [Español](i18n/readme/README_ES.md) | [Italiano](i18n/readme/README_IT.md) | [ไทย](i18n/readme/README_TH.md) | [Deutsch](i18n/readme/README_DE.md) | [Tiếng Việt](i18n/readme/README_VI.md) | [עִברִית](i18n/readme/README_HE.md) | [Tagalog](i18n/readme/README_TG.md) | [Polski](i18n/readme/README_PL.md) | [Arabic](i18n/readme/README_AR.md) | [Hungarian](i18n/readme/README_HU.md) | [Srpski](i18n/readme/README_RS.md) | [Română](i18n/readme/README_RO.md) | [Nederlands](i18n/readme/README_NL.md) | [Ελληνικά](i18n/readme/README_GR.md)
+- **Oracle Manipulation**: Vulnerable to price manipulation during disputes despite "priceless contracts"
+- **Centralization**: Concentrated token ownership (98% retained by team) limits decentralization
+- **Slow Dispute Resolution**: Token-holder voting system creates delays for time-sensitive applications
+- **Security Economics**: Relies on attack costs exceeding potential profits; vulnerable during market extremes
+- **Limited Oracle Infrastructure**: Minimal architecture creates vulnerabilities when robust alternatives aren't available
 
-## 🚩 Overview
+### Case Study: Polymarket Disputed Resolution
 
-<div align="center">
-  <img src="./docs/static/img/eliza_diagram.png" alt="Eliza Diagram" width="100%" />
-</div>
+The claim "Trump declassifies Epstein list in first 100 days?" was resolved to "Yes" on Polymarket, leading to significant user disputes:
 
-## ✨ Features
+![Trump declassifies Epstein list on Polymarket](figures/Polymarket1.png)
 
-- 🛠️ Full-featured Discord, X (Twitter) and Telegram connectors
-- 🔗 Support for every model (Llama, Grok, OpenAI, Anthropic, Gemini, etc.)
-- 👥 Multi-agent and room support
-- 📚 Easily ingest and interact with your documents
-- 💾 Retrievable memory and document store
-- 🚀 Highly extensible - create your own actions and clients
-- 📦 Just works!
+Users strongly contested this resolution:
 
-## Video Tutorials
+![Comment 1](figures/Comment1.png)
 
-[AI Agent Dev School](https://www.youtube.com/watch?v=ArptLpQiKfI&list=PLx5pnFXdPTRzWla0RaOxALTSTnVq53fKL)
+![Comment 2](figures/Comment2.png)
 
-## 🎯 Use Cases
+Prophet AI provides a more nuanced and appropriate response, concluding it is **too early** to resolve the market. Not enough substantive evidence has been released to resolve to "Yes," and the 100-day deadline has not been reached yet.
 
-- 🤖 Chatbots
-- 🕵️ Autonomous Agents
-- 📈 Business Process Handling
-- 🎮 Video Game NPCs
-- 🧠 Trading
+<img src="figures/ClaimPolymarket1.png" alt="Too early claim" style="width:60%; max-width:800px; height:auto;" />
 
-## 🚀 Quick Start
+### Case Study: Scientific Consensus Manipulation
 
-### Prerequisites
+Another troubling example is the Polymarket question "Is Earth flat?" with over $76,000 in trading volume, showing a 3% chance of "YES" despite overwhelming scientific consensus.
 
-- [Python 2.7+](https://www.python.org/downloads/)
-- [Node.js 23+](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-- [pnpm](https://pnpm.io/installation)
+![Earth is flat market on Polymarket](figures/Polymarket3.png)
 
-> **Note for Windows Users:** [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install-manual) is required.
+Some users are clearly trolling or manipulating the market:
 
-### Use the Starter (Recommended for Agent Creation)
+![Comment on flat Earth market](figures/Comment3.png)
 
-Full steps and documentation can be found in the [Eliza Starter Repository](https://github.com/elizaOS/eliza-starter).
+This case demonstrates how even settled scientific questions can be distorted in prediction markets when resolvers like UMA are susceptible to manipulation. Prophet AI agents provide definitive, evidence-based resolutions that eliminate such manipulation potential:
+
+## Our Solution
+
+Prophet.ai leverages AI agents alongside blockchain infrastructure to prevent bias and ensure censorship resistance in oracle solutions for prediction markets.
+
+### Key Benefits
+
+- **Multi-source Verification**: AI agents access Internet data through multiple sources
+- **Diverse LLM Processing**: Information is processed using various LLMs in a jury-like architecture
+- **Decentralized Decision-making**: Simulated agents debate for and against claims
+- **Censorship Resistance**: Runs on multiple instances across TEE operators.
+- **Transparent Results**: Final aggregation evaluates evidence and delivers clear resolutions
+
+The Prophet AI agent runs on multiple instances across a network of TEEs. TEEs ensure that Prophet Agents operators are running genuine Prophet instances. Users submit requests for claim verification via an on-chain smart contract, and an available operator picks up the task, executes the agent, and submits the verified result back on-chain.
+
+## How Prophet AI Works
+
+### Agentic Verification Mechanism
+
+The agentic mechanism used by Prophet to evaluate a claim is described below:
+
+![Prophet AI Agents Architecture](figures/TruthSeekerAI.png)
+
+1. **Research Phase**: After receiving a claim or statement, Prophet Agents leverages two teams of simulated agents:
+   - **Blue Team**: Argues in favor of the claim
+   - **Red Team**: Argues against the claim
+
+   Each team conducts comprehensive research using multiple search providers:
+   - Tavily
+   - Exa
+   - Serper
+   - Perplexity
+   - Twitter
+
+   A *team aggregator* builds the strongest possible case from the evidence. Note that each aggregator need not agree with its team if the evidence is inadequate.
+
+2. **Evidence Evaluation**: Team aggregators' statements are submitted to a final aggregator for evaluation.
+
+3. **Assessment Generation**: The final aggregator produces a detailed report including:
+   - Supporting evidence
+   - Confidence score (0-100%)
+   - One of the following resolutions:
+     - **True**: Claim is accurate based on evidence
+     - **False**: Claim is inaccurate based on evidence
+     - **Inconclusive**: Insufficient evidence to decide
+     - **Depends**: Claim requires additional context
+     - **Too early**: Evidence will become available in the future
+
+### Blockchain Infrastructure
+
+Prophet utilizes an agentic workflow in a decentralized architecture that combines AI-powered research with blockchain verification.
+
+### System Participants
+
+The following parties interact in the Prophet network:
+
+1. **Market Creators**: Submit claims to be verified along with payment
+2. **Operators**: Run instances of Prophet Agents in TEEs and register on the operator registry smart contract
+3. **Smart Contract System**: Manages verification process, operator registration, and TEE verification
+
+### Verification Workflow
+
+1. **Operator Registration**: Operators run Prophet AI agent in a TEE and register on the OperatorRegistry contract
+2. **Claim Submission**: Market creators submit claims with payment through the smart contract
+3. **Task Assignment**: Tasks are assigned based on submission timestamp
+4. **Task Execution**: Operators run claim verification on the Prophet AI agent
+5. **On-chain Verification**: Assessment is submitted to the blockchain as a permanent record
+6. **Payment Processing**: Operators receive payment, and users receive verification results
+
+*Note: Prophet only submits verification results on-chain without detailed reports due to gas considerations.*
+
+## Getting Started
+
+### Installation
+
 ```bash
-git clone https://github.com/elizaos/eliza-starter.git
-cd eliza-starter
+git clone https://github.com/hfarazul/Agentic-Prediction-Market
+cd Agentic-Prediction-Market
+pnpm install
 cp .env.example .env
-pnpm i && pnpm build && pnpm start
 ```
 
-### Manually Start Eliza (Only recommended for plugin or platform development)
+### Configuration
 
-#### Checkout the latest release
+Fill the following fields in your `.env` file:
+
+```
+ANTHROPIC_API_KEY=
+TAVILY_API_KEY=
+EXA_API_KEY=
+PERPLEXITY_API_KEY=
+```
+
+### Running the Agent
 
 ```bash
-# Clone the repository
-git clone https://github.com/elizaos/eliza.git
-
-# This project iterates fast, so we recommend checking out the latest release
-git checkout $(git describe --tags --abbrev=0)
-# If the above doesn't checkout the latest release, this should work:
-# git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+pnpm build && pnpm start
 ```
 
-If you would like the sample character files too, then run this:
-```bash
-# Download characters submodule from the character repos
-git submodule update --init
-```
-
-#### Edit the .env file
-
-Copy .env.example to .env and fill in the appropriate values.
-
-```
-cp .env.example .env
-```
-
-Note: .env is optional. If you're planning to run multiple distinct agents, you can pass secrets through the character JSON
-
-#### Start Eliza
+### Running the Prediction Market
 
 ```bash
-pnpm i
-pnpm build
-pnpm start
-
-# The project iterates fast, sometimes you need to clean the project if you are coming back to the project
-pnpm clean
+cd frontend
+pnpm install --ignore-workspace
+pnpm dev
 ```
 
-### Interact via Browser
+Navigate to the local development server to interact with Prophet.ai and its agents through the UI.
 
-Once the agent is running, you should see the message to run "pnpm start:client" at the end.
+## Examples & Case Studies of Prophets Agents
 
-Open another terminal, move to the same directory, run the command below, then follow the URL to chat with your agent.
+### Scientific Claims
 
-```bash
-pnpm start:client
-```
+**Claim: Humans only use 10% of their brains**
 
-Then read the [Documentation](https://elizaos.github.io/eliza/) to learn how to customize your Eliza.
+<img src="figures/ClaimFalse.png" alt="False claim" style="width:60%; max-width:800px; height:auto;" />
 
----
+### Health-Related Claims
 
-### Automatically Start Eliza
+**Claim: 5G networks are harmful to human health**
 
-The start script provides an automated way to set up and run Eliza:
+<img src="figures/ClaimInconclusive.png" alt="Inconclusive claim" style="width:60%; max-width:800px; height:auto;" />
 
-```bash
-sh scripts/start.sh
-```
+### Technology Release Claims
 
-For detailed instructions on using the start script, including character management and troubleshooting, see our [Start Script Guide](./docs/docs/guides/start-script.md).
+**Polymarket Case Study: Macbook Air M4 released before April?**
 
-> **Note**: The start script handles all dependencies, environment setup, and character management automatically.
+![Macbook Air M4 on Polymarket](figures/Polymarket2.png)
 
----
+<img src="figures/ClaimPolymarket2.png" alt="Resolution" style="width:60%; max-width:800px; height:auto;" />
 
-### Modify Character
-
-1. Open `packages/core/src/defaultCharacter.ts` to modify the default character. Uncomment and edit.
-
-2. To load custom characters:
-    - Use `pnpm start --characters="path/to/your/character.json"`
-    - Multiple character files can be loaded simultaneously
-3. Connect with X (Twitter)
-    - change `"clients": []` to `"clients": ["twitter"]` in the character file to connect with X
-
----
-
-### Add more plugins
-
-1. run `npx elizaos plugins list` to get a list of available plugins or visit https://elizaos.github.io/registry/
-
-2. run `npx elizaos plugins add @elizaos-plugins/plugin-NAME` to install the plugin into your instance
-
-#### Additional Requirements
-
-You may need to install Sharp. If you see an error when starting up, try installing it with the following command:
-
-```
-pnpm install --include=optional sharp
-```
-
----
-
-### Start Eliza with Gitpod
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/elizaos/eliza/tree/main)
-
----
-
-### Deploy Eliza in one click
-
-Use [Fleek](https://fleek.xyz/eliza/) to deploy Eliza in one click. This opens Eliza to non-developers and provides the following options to build your agent:
-1. Start with a template
-2. Build characterfile from scratch
-3. Upload pre-made characterfile
-
-Click [here](https://fleek.xyz/eliza/) to get started!
-
----
-
-### Community & contact
-
-- [GitHub Issues](https://github.com/elizaos/eliza/issues). Best for: bugs you encounter using Eliza, and feature proposals.
-- [elizaOS Discord](https://discord.gg/elizaos). Best for: hanging out with the elizaOS technical community
-- [DAO Discord](https://discord.gg/ai16z). Best for: hanging out with the larger non-technical community
-
-## Citation
-
-We now have a [paper](https://arxiv.org/pdf/2501.06781) you can cite for the Eliza OS:
-```bibtex
-@article{walters2025eliza,
-  title={Eliza: A Web3 friendly AI Agent Operating System},
-  author={Walters, Shaw and Gao, Sam and Nerd, Shakker and Da, Feng and Williams, Warren and Meng, Ting-Chien and Han, Hunter and He, Frank and Zhang, Allen and Wu, Ming and others},
-  journal={arXiv preprint arXiv:2501.06781},
-  year={2025}
-}
-```
-
-## Contributors
-
-<a href="https://github.com/elizaos/eliza/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=elizaos/eliza" alt="Eliza project contributors" />
-</a>
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=elizaos/eliza&type=Date)](https://star-history.com/#elizaos/eliza&Date)
-
-## 🛠️ System Requirements
-
-### Minimum Requirements
-- CPU: Dual-core processor
-- RAM: 4GB
-- Storage: 1GB free space
-- Internet connection: Broadband (1 Mbps+)
-
-### Software Requirements
-- Python 2.7+ (3.8+ recommended)
-- Node.js 23+
-- pnpm
-- Git
-
-### Optional Requirements
-- GPU: For running local LLM models
-- Additional storage: For document storage and memory
-- Higher RAM: For running multiple agents
-
-## 📁 Project Structure
-```
-eliza/
-├── packages/
-│   ├── core/           # Core Eliza functionality
-│   ├── clients/        # Client implementations
-│   └── actions/        # Custom actions
-├── docs/              # Documentation
-├── scripts/           # Utility scripts
-└── examples/          # Example implementations
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-### Getting Started
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature/your-feature-name`
-3. Make your changes
-4. Run tests: `pnpm test`
-5. Submit a pull request
-
-### Types of Contributions
-- 🐛 Bug fixes
-- ✨ New features
-- 📚 Documentation improvements
-- 🌍 Translations
-- 🧪 Test improvements
-
-### Code Style
-- Follow the existing code style
-- Add comments for complex logic
-- Update documentation for changes
-- Add tests for new features
+This resolved to "Yes" on Polymarket, which Prophet AI agents agrees with, demonstrating consensus in clear cases.
