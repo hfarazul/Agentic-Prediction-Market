@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {Script} from "forge-std/Script.sol";
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {Market} from "../src/Market.sol";
+import {Resolver} from "../src/Resolver.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract DeployPredictionMarket is Script {
@@ -27,6 +28,10 @@ contract DeployPredictionMarket is Script {
             address(predictionMarket)
         );
 
+        // Deploy the resolver too
+        Resolver resolver = new Resolver(deployerAddress);
+        console2.log("Resolver deployed at:", address(resolver));
+
         // Create a test market if we're on a test network
         if (block.chainid != 1) {
             // Not mainnet
@@ -36,7 +41,7 @@ contract DeployPredictionMarket is Script {
                 memory details = "The market will resolve to YES if the price of ETH/USD reaches or exceeds $5000 on any major exchange before December 31st, 2024 23:59:59 UTC.";
             uint256 endTime = block.timestamp + 365 days; // 1 year from now
             string memory imageUrl = "https://example.com/eth.png";
-            address resolverAddress = deployerAddress; // Use deployer as resolver for test
+            address resolverAddress = address(resolver);
 
             // Create market with initial fee
             uint256 marketId = predictionMarket.createMarket{value: 0.1 ether}(
@@ -62,19 +67,5 @@ contract DeployPredictionMarket is Script {
         console2.log("Deployment completed!");
         console2.log("Network:", block.chainid);
         console2.log("Deployer:", deployerAddress);
-    }
-}
-
-contract UpgradePredictionMarket is Script {
-    function run() external {
-        // Get deployment private key from environment
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-
-        // Start broadcasting transactions
-        vm.startBroadcast(deployerPrivateKey);
-
-        // Add upgrade logic here when needed
-
-        vm.stopBroadcast();
     }
 }
